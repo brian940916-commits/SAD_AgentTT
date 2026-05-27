@@ -3,18 +3,464 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent TT — 首頁</title>
+  <title>Agent TT — 乘著小火車，遇見中彰投</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(160deg, #1A3A2E 0%, #2C4A3E 55%, #3D6B52 100%);
+      padding: 72px var(--space-xl) 0;
+      position: relative;
+      overflow: hidden;
+      min-height: 480px;
+      display: flex;
+      align-items: flex-start;
+    }
+    .hero-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      gap: var(--space-2xl);
+      align-items: center;
+      padding-bottom: 60px;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-eyebrow {
+      font-size: 11px;
+      color: #C5B886;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .hero-title {
+      font-size: 44px;
+      font-weight: 800;
+      color: #FAF6EC;
+      line-height: 1.3;
+      margin-bottom: 12px;
+    }
+    .hero-sub {
+      font-size: 16px;
+      color: #C5B886;
+      letter-spacing: 3px;
+      margin-bottom: 40px;
+    }
+
+    /* 搜尋列 */
+    .hero-search {
+      background: rgba(255,255,255,0.96);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .hero-search-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .hero-search-label { font-size: 11px; font-weight: 600; color: #6B6354; letter-spacing: 1px; }
+    .hero-search-input {
+      border: none;
+      border-bottom: 2px solid #E0D5A8;
+      padding: 6px 0;
+      font-size: 14px;
+      color: #2C4A3E;
+      background: transparent;
+      outline: none;
+      width: 100%;
+      font-family: var(--font-main);
+      transition: border-color var(--transition);
+    }
+    .hero-search-input:focus { border-bottom-color: #2C4A3E; }
+
+    /* Hero SVG 裝飾 */
+    .hero-svg-wrap {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    /* 底部波浪 */
+    .hero-wave {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 100%;
+      line-height: 0;
+    }
+
+    /* ── 模組入口 ── */
+    .modules-section { padding: var(--space-3xl) var(--space-xl); }
+    .modules-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--space-lg); margin-top: var(--space-xl); }
+
+    .module-card {
+      background: #FFFFFF;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      transition: box-shadow var(--transition), transform var(--transition);
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+    .module-card:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-3px);
+    }
+    .module-icon-wrap {
+      width: 56px; height: 56px;
+      border-radius: var(--radius-md);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+    }
+    .module-icon-a { background: #FBEAEA; }
+    .module-icon-b { background: #E8F4ED; }
+    .module-icon-c { background: #F0E5BC; }
+
+    .module-title { font-size: 18px; font-weight: 700; color: var(--color-text-main); }
+    .module-desc  { font-size: 14px; color: var(--color-text-sub); line-height: 1.7; flex: 1; }
+    .module-link  {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 13px; font-weight: 600; color: var(--color-primary);
+      margin-top: var(--space-xs);
+    }
+    .module-link::after { content: '→'; }
+
+    /* ── 推薦小站 ── */
+    .stations-section {
+      background: #FFFFFF;
+      padding: var(--space-3xl) var(--space-xl);
+      border-top: 1px solid var(--color-border-light);
+    }
+    .stations-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--space-lg); margin-top: var(--space-xl); }
+
+    .station-card {
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: box-shadow var(--transition), transform var(--transition);
+    }
+    .station-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+
+    .station-thumb {
+      height: 140px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 64px;
+      background: linear-gradient(135deg, #2C4A3E 0%, #3D6B52 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .station-thumb-label {
+      position: absolute; bottom: 10px; right: 12px;
+      font-size: 11px; color: rgba(255,255,255,0.6); letter-spacing: 2px;
+    }
+    .station-body { padding: 20px; }
+    .station-name { font-size: 17px; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px; }
+    .station-tags { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+    .station-tag {
+      font-size: 11px; padding: 2px 10px; border-radius: 99px;
+      background: var(--color-secondary); color: var(--color-text-sub);
+      border: 1px solid var(--color-border-light);
+    }
+    .station-desc { font-size: 13px; color: var(--color-text-sub); line-height: 1.7; }
+
+    /* ── 號召區塊 ── */
+    .cta-section {
+      background: linear-gradient(135deg, #2C4A3E 0%, #1A3A2E 100%);
+      padding: var(--space-3xl) var(--space-xl);
+      text-align: center;
+    }
+    .cta-title { font-size: 28px; font-weight: 700; color: #FAF6EC; margin-bottom: 12px; }
+    .cta-sub   { font-size: 15px; color: #C5B886; margin-bottom: var(--space-xl); line-height: 1.8; }
+    .cta-btns  { display: flex; gap: var(--space-md); justify-content: center; flex-wrap: wrap; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<div id="app">
+
+  <!-- ═══ Hero ═══ -->
+  <section class="hero" aria-label="首頁主視覺">
+    <div class="hero-inner">
+
+      <!-- 左側文字 + 搜尋 -->
+      <div>
+        <div class="hero-eyebrow">台鐵 × 中彰投鐵道旅遊平台</div>
+        <h1 class="hero-title">乘著小火車<br>遇見中彰投</h1>
+        <p class="hero-sub">— 從一個小站開始你的旅程 —</p>
+
+        <div class="hero-search" role="search">
+          <div class="hero-search-field">
+            <span class="hero-search-label">出發車站</span>
+            <select class="hero-search-input" id="search-station" aria-label="選擇出發車站">
+              <option value="">請選擇車站</option>
+              <optgroup label="台中縣市">
+                <option>台中站</option><option>豐原站</option><option>新烏日站</option>
+              </optgroup>
+              <optgroup label="彰化縣">
+                <option>彰化站</option><option>二水站</option><option>田中站</option><option>員林站</option>
+              </optgroup>
+              <optgroup label="南投縣（集集線）">
+                <option>集集站</option><option>水里站</option><option>車埕站</option>
+                <option>源泉站</option><option>濁水站</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="hero-search-field">
+            <span class="hero-search-label">出發日期</span>
+            <input class="hero-search-input" type="date" id="search-date" aria-label="出發日期"/>
+          </div>
+          <div class="hero-search-field" style="max-width:80px;">
+            <span class="hero-search-label">人數</span>
+            <select class="hero-search-input" id="search-guests" aria-label="旅遊人數">
+              <option>1 人</option><option selected>2 人</option>
+              <option>3 人</option><option>4 人</option><option>5 人以上</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" style="flex-shrink:0;padding:10px 24px;" onclick="startPlan()">
+            開始規劃
+          </button>
+        </div>
+      </div>
+
+      <!-- 右側插圖 SVG -->
+      <div class="hero-svg-wrap" aria-hidden="true">
+        <svg width="440" height="340" viewBox="0 0 440 340">
+          <!-- 山稜背景 -->
+          <path d="M0,200 Q80,140 160,165 T320,148 Q380,135 440,155 L440,340 L0,340 Z" fill="#3D6B52" opacity="0.5"/>
+          <path d="M0,235 Q110,205 220,218 T440,208 L440,340 L0,340 Z" fill="#4A7A5F" opacity="0.4"/>
+          <!-- 樹木 -->
+          <g transform="translate(20,108)">
+            <path d="M0,70 L32,8 L64,70 Z" fill="#5A7D4F" opacity="0.8"/>
+            <path d="M48,70 L82,22 L116,70 Z" fill="#4A6D3F" opacity="0.8"/>
+          </g>
+          <g transform="translate(318,94)">
+            <path d="M0,76 L34,12 L68,76 Z" fill="#5A7D4F" opacity="0.8"/>
+            <path d="M54,76 L84,28 L114,76 Z" fill="#4A6D3F" opacity="0.8"/>
+          </g>
+          <!-- 小丘 -->
+          <ellipse cx="220" cy="235" rx="90" ry="28" fill="#3D6B52" opacity="0.35"/>
+          <!-- 鐵軌 -->
+          <g transform="translate(60,230)">
+            <line x1="0" y1="0"  x2="320" y2="0"  stroke="#C5B886" stroke-width="3" stroke-dasharray="18 8" opacity="0.4"/>
+            <line x1="0" y1="12" x2="320" y2="12" stroke="#C5B886" stroke-width="3" stroke-dasharray="18 8" opacity="0.4"/>
+            <!-- 枕木 -->
+            <line x1="16"  y1="-5" x2="16"  y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="52"  y1="-5" x2="52"  y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="88"  y1="-5" x2="88"  y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="124" y1="-5" x2="124" y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="160" y1="-5" x2="160" y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="196" y1="-5" x2="196" y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="232" y1="-5" x2="232" y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="268" y1="-5" x2="268" y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+            <line x1="304" y1="-5" x2="304" y2="17" stroke="#C5B886" stroke-width="2.5" opacity="0.28"/>
+          </g>
+          <!-- 火車主體 -->
+          <g transform="translate(130,188)">
+            <!-- 車廂 -->
+            <rect x="0"  y="0" width="90" height="42" rx="6" fill="#C4514A" stroke="#8B3A34" stroke-width="1.5"/>
+            <rect x="92" y="6" width="62" height="36" rx="4" fill="#C4514A" stroke="#8B3A34" stroke-width="1.5"/>
+            <!-- 車頭連接 -->
+            <rect x="88" y="15" width="8" height="18" fill="#8B3A34"/>
+            <!-- 車窗（車廂）-->
+            <rect x="8"  y="8" width="16" height="14" rx="2" fill="#FAEEDA" opacity="0.9"/>
+            <rect x="32" y="8" width="16" height="14" rx="2" fill="#FAEEDA" opacity="0.9"/>
+            <rect x="56" y="8" width="16" height="14" rx="2" fill="#FAEEDA" opacity="0.9"/>
+            <!-- 車窗（車頭）-->
+            <rect x="100" y="11" width="14" height="12" rx="2" fill="#FAEEDA" opacity="0.9"/>
+            <rect x="122" y="11" width="14" height="12" rx="2" fill="#FAEEDA" opacity="0.9"/>
+            <!-- 前燈 -->
+            <rect x="150" y="9" width="11" height="11" rx="3" fill="#E8C547"/>
+            <!-- 車輪 -->
+            <circle cx="22"  cy="46" r="7" fill="#FAF6EC" stroke="#8B3A34" stroke-width="1.5"/>
+            <circle cx="68"  cy="46" r="7" fill="#FAF6EC" stroke="#8B3A34" stroke-width="1.5"/>
+            <circle cx="110" cy="46" r="7" fill="#FAF6EC" stroke="#8B3A34" stroke-width="1.5"/>
+            <circle cx="145" cy="46" r="7" fill="#FAF6EC" stroke="#8B3A34" stroke-width="1.5"/>
+            <!-- 煙霧 -->
+            <circle cx="148" cy="-12" r="6"  fill="#FAF6EC" opacity="0.22"/>
+            <circle cx="158" cy="-20" r="9"  fill="#FAF6EC" opacity="0.16"/>
+            <circle cx="170" cy="-28" r="12" fill="#FAF6EC" opacity="0.10"/>
+          </g>
+          <!-- 裝飾星點 -->
+          <circle cx="55"  cy="70"  r="2" fill="#E8C547" opacity="0.5"/>
+          <circle cx="390" cy="55"  r="2" fill="#E8C547" opacity="0.5"/>
+          <circle cx="300" cy="90"  r="1.5" fill="#E8C547" opacity="0.4"/>
+          <circle cx="80"  cy="130" r="1.5" fill="#FAF6EC" opacity="0.3"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 底部波浪 -->
+    <div class="hero-wave" aria-hidden="true">
+      <svg viewBox="0 0 1440 60" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" height="60">
+        <path d="M0,30 Q360,60 720,30 T1440,30 L1440,60 L0,60 Z" fill="#FAF6EC"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ═══ 三大模組入口 ═══ -->
+  <section class="modules-section" aria-label="三大模組">
+    <div class="page-container">
+      <h2 class="section-title">你想做什麼？</h2>
+      <div class="modules-grid">
+
+        <a href="trip-list.html" class="module-card">
+          <div class="module-icon-wrap module-icon-a">🗓️</div>
+          <div>
+            <div class="module-title">行程規劃</div>
+            <div class="module-desc">
+              建立多日行程、安排景點時程、與旅伴協作投票、追蹤旅遊費用與分帳。
+            </div>
+          </div>
+          <span class="module-link">開始規劃</span>
+        </a>
+
+        <a href="property-search.html" class="module-card">
+          <div class="module-icon-wrap module-icon-b">🏡</div>
+          <div>
+            <div class="module-title">住宿訂房</div>
+            <div class="module-desc">
+              搜尋中彰投各小站周邊特色民宿，輕鬆比較房型與價格，一鍵完成訂房。
+            </div>
+          </div>
+          <span class="module-link">搜尋房源</span>
+        </a>
+
+        <a href="train-search.html" class="module-card">
+          <div class="module-icon-wrap module-icon-c">🚂</div>
+          <div>
+            <div class="module-title">台鐵車票</div>
+            <div class="module-desc">
+              查詢集集線轉乘組合、線上訂票付款、管理票券與退改票，累積點數享優惠。
+            </div>
+          </div>
+          <span class="module-link">查詢車次</span>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 推薦小站 ═══ -->
+  <section class="stations-section" aria-label="推薦小站">
+    <div class="page-container">
+      <h2 class="section-title">中彰投嚴選小站</h2>
+      <div class="stations-grid">
+
+        <article class="station-card">
+          <div class="station-thumb" style="background:linear-gradient(135deg,#2C4A3E,#4A7A5F);">
+            <span>🚉</span>
+            <span class="station-thumb-label">JIJI STATION</span>
+          </div>
+          <div class="station-body">
+            <div class="station-name">集集站</div>
+            <div class="station-tags">
+              <span class="station-tag">南投縣</span>
+              <span class="station-tag">集集線</span>
+              <span class="station-tag">日式木造</span>
+            </div>
+            <p class="station-desc">
+              百年歷史的日式木造車站，全台最美小站之一。周邊有香蕉特產、明新書院、
+              濁水溪河濱，步行即可抵達。
+            </p>
+          </div>
+        </article>
+
+        <article class="station-card">
+          <div class="station-thumb" style="background:linear-gradient(135deg,#3D5A2C,#5A7D4F);">
+            <span>🏭</span>
+            <span class="station-thumb-label">CHANGHUA STATION</span>
+          </div>
+          <div class="station-body">
+            <div class="station-name">彰化扇形車庫</div>
+            <div class="station-tags">
+              <span class="station-tag">彰化縣</span>
+              <span class="station-tag">工業遺產</span>
+              <span class="station-tag">鐵道迷必訪</span>
+            </div>
+            <p class="station-desc">
+              全台碩果僅存的扇形車庫，見證台灣鐵道百年歷史。每逢假日開放參觀，
+              是攝影與親子旅遊的熱門景點。
+            </p>
+          </div>
+        </article>
+
+        <article class="station-card">
+          <div class="station-thumb" style="background:linear-gradient(135deg,#4A3A1A,#7A5A2C);">
+            <span>🪵</span>
+            <span class="station-thumb-label">CHECHENG STATION</span>
+          </div>
+          <div class="station-body">
+            <div class="station-name">車埕站</div>
+            <div class="station-tags">
+              <span class="station-tag">南投縣</span>
+              <span class="station-tag">集集線終點</span>
+              <span class="station-tag">木業文化</span>
+            </div>
+            <p class="station-desc">
+              集集線終點站，昔日木業重鎮，現為特色小鎮。木業展示館、日月潭纜車
+              入口就在附近，旅遊資源豐富。
+            </p>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 號召區塊（未登入才顯示）═══ -->
+  <section class="cta-section" id="cta-section" style="display:none;" aria-label="立即加入">
+    <div class="page-container">
+      <h2 class="cta-title">準備好出發了嗎？</h2>
+      <p class="cta-sub">
+        加入 Agent TT，讓小火車帶你探索中彰投的每一個角落。<br>
+        免費規劃行程・輕鬆訂房訂票・與旅伴一起出發。
+      </p>
+      <div class="cta-btns">
+        <a href="login.html" class="btn btn-yellow btn-lg">免費加入會員</a>
+        <a href="trip-list.html" class="btn btn-outline btn-lg"
+           style="color:#FAF6EC;border-color:#FAF6EC;">直接開始規劃</a>
+      </div>
+    </div>
+  </section>
+
+</div><!-- end #app -->
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+  renderNav();
+  renderFooter();
+
+  /* 設定今日為搜尋預設日期 */
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('search-date').value = today;
+  document.getElementById('search-date').min   = today;
+
+  /* 未登入才顯示 CTA 區塊 */
+  if (!getCurrentUser()) {
+    document.getElementById('cta-section').style.display = 'block';
+  }
+
+  /* 點擊「開始規劃」→ 跳轉 trip-list.html（帶車站參數）*/
+  function startPlan() {
+    const station = document.getElementById('search-station').value;
+    const date    = document.getElementById('search-date').value;
+    const guests  = document.getElementById('search-guests').value;
+    const params  = new URLSearchParams({ station, date, guests }).toString();
+    window.location.href = 'trip-list.html?' + params;
+  }
+
+  /* Enter 鍵在搜尋列觸發規劃 */
+  document.querySelector('.hero-search').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startPlan();
+  });
+</script>
 </body>
 </html>
