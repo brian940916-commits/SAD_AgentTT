@@ -5,16 +5,703 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 我的行程</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    .page-header {
+      background: #fff;
+      border-bottom: 1px solid var(--color-border-light);
+      padding: var(--space-lg) 0;
+    }
+    .page-header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .page-title { font-size: 24px; font-weight: 700; color: var(--color-text-main); }
+    .page-subtitle { font-size: 13px; color: var(--color-text-light); margin-top: 2px; }
+
+    .content-area { padding: var(--space-xl) 0 var(--space-3xl); }
+
+    /* ── 行程卡片 ── */
+    .trip-card {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      display: grid;
+      grid-template-columns: 68px 1fr auto;
+      gap: var(--space-lg);
+      align-items: start;
+      transition: box-shadow var(--transition), transform var(--transition);
+      margin-bottom: var(--space-md);
+    }
+    .trip-card:hover { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+
+    /* 日期方塊 */
+    .trip-date-box {
+      background: var(--color-primary);
+      border-radius: var(--radius-md);
+      padding: 10px 8px;
+      text-align: center;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .trip-date-month { font-size: 11px; letter-spacing: 1px; opacity: 0.8; }
+    .trip-date-day   { font-size: 26px; font-weight: 800; line-height: 1.1; }
+
+    /* 行程資訊 */
+    .trip-name-row { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: 8px; }
+    .trip-name { font-size: 17px; font-weight: 700; color: var(--color-text-main); }
+
+    .trip-meta { font-size: 13px; color: var(--color-text-sub); display: flex; gap: var(--space-md); flex-wrap: wrap; margin-bottom: 10px; }
+    .trip-meta-item { display: flex; align-items: center; gap: 4px; }
+
+    .trip-tags { display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center; }
+    .trip-tag-integrated {
+      font-size: 12px; padding: 3px 10px;
+      border-radius: var(--radius-xl);
+      background: var(--color-success);
+      color: var(--color-success-text);
+      font-weight: 500;
+    }
+    .trip-budget { font-size: 13px; color: var(--color-text-sub); }
+    .trip-budget strong { color: var(--color-primary); font-weight: 700; }
+
+    /* 右側操作 */
+    .trip-actions { display: flex; flex-direction: column; gap: var(--space-sm); align-items: flex-end; }
+
+    /* ── 建立行程 Modal ── */
+    .stations-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .modal-station-select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-family: var(--font-main);
+      color: var(--color-text-main);
+      background: #fff;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B6354' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+      cursor: pointer;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    .modal-station-select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(44,74,62,0.1);
+    }
+
+    /* ── 刪除確認 Modal ── */
+    .delete-confirm-name {
+      font-weight: 700;
+      color: var(--color-accent-red);
+    }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<div id="app">
+
+  <!-- 頁首 -->
+  <div class="page-header">
+    <div class="page-container">
+      <div class="page-header-inner">
+        <div>
+          <h1 class="page-title">我的行程</h1>
+          <p class="page-subtitle" id="trip-count-text">載入中…</p>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateModal()">＋ 建立新行程</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 篩選列 + 行程列表 -->
+  <div class="content-area">
+    <div class="page-container">
+
+      <!-- 篩選 -->
+      <div class="filter-bar" role="group" aria-label="行程狀態篩選">
+        <button class="filter-btn active" data-filter="all"       onclick="setFilter('all')">全部</button>
+        <button class="filter-btn"        data-filter="planning"  onclick="setFilter('planning')">規劃中</button>
+        <button class="filter-btn"        data-filter="completed" onclick="setFilter('completed')">已完成</button>
+        <button class="filter-btn"        data-filter="cancelled" onclick="setFilter('cancelled')">已取消</button>
+      </div>
+
+      <!-- 行程列表 -->
+      <div id="trip-list"></div>
+
+    </div>
+  </div>
+
+</div><!-- end #app -->
+
+<!-- ══════════════════════════════════════════════
+     建立新行程 Modal
+══════════════════════════════════════════════ -->
+<div class="modal-backdrop hidden" id="create-modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="create-modal-title">建立新行程</h2>
+      <button class="modal-close" onclick="closeCreateModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- 步驟指示器 -->
+      <div class="stepper" id="create-stepper">
+        <div class="step active" id="step-ind-1">
+          <div class="step-circle">1</div>
+          <div class="step-label">基本資訊</div>
+          <div class="timeline-line" style="display:none;"></div>
+        </div>
+        <div class="step" id="step-ind-2">
+          <div class="step-circle">2</div>
+          <div class="step-label">選擇車站</div>
+        </div>
+        <div class="step" id="step-ind-3">
+          <div class="step-circle">3</div>
+          <div class="step-label">確認建立</div>
+        </div>
+      </div>
+
+      <!-- Step 1：基本資訊 -->
+      <div id="create-step-1">
+        <div class="form-group">
+          <label class="form-label" for="new-trip-name">行程名稱 <span style="color:var(--color-accent-red)">*</span></label>
+          <input class="form-input" type="text" id="new-trip-name"
+                 placeholder="例：集集線三日慢旅" maxlength="40"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);">
+          <div class="form-group">
+            <label class="form-label" for="new-trip-start">出發日期 <span style="color:var(--color-accent-red)">*</span></label>
+            <input class="form-input" type="date" id="new-trip-start"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-trip-end">返回日期 <span style="color:var(--color-accent-red)">*</span></label>
+            <input class="form-input" type="date" id="new-trip-end"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new-trip-budget">預估總預算（NT$）</label>
+          <input class="form-input" type="number" id="new-trip-budget"
+                 placeholder="選填，例：8000" min="0" step="100"/>
+        </div>
+        <div class="error-msg" id="step1-error" style="display:none;"></div>
+      </div>
+
+      <!-- Step 2：選擇車站 -->
+      <div id="create-step-2" style="display:none;">
+        <p style="font-size:14px;color:var(--color-text-sub);margin-bottom:var(--space-md);">
+          選擇此行程的主要出發/探索車站：
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="new-trip-station">出發車站 <span style="color:var(--color-accent-red)">*</span></label>
+          <select class="modal-station-select" id="new-trip-station">
+            <option value="">請選擇車站</option>
+            <optgroup label="彰化縣">
+              <option value="彰化站">彰化站</option>
+              <option value="花壇站">花壇站</option>
+              <option value="大村站">大村站</option>
+              <option value="員林站">員林站</option>
+              <option value="田中站">田中站</option>
+              <option value="二水站">二水站</option>
+            </optgroup>
+            <optgroup label="南投縣（集集線）">
+              <option value="集集站">集集站</option>
+              <option value="源泉站">源泉站</option>
+              <option value="濁水站">濁水站</option>
+              <option value="龍泉站">龍泉站</option>
+              <option value="水里站">水里站</option>
+              <option value="車埕站">車埕站</option>
+            </optgroup>
+            <optgroup label="台中市">
+              <option value="台中站">台中站</option>
+              <option value="豐原站">豐原站</option>
+              <option value="新烏日站">新烏日站</option>
+              <option value="大肚站">大肚站</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="error-msg" id="step2-error" style="display:none;"></div>
+      </div>
+
+      <!-- Step 3：確認 -->
+      <div id="create-step-3" style="display:none;">
+        <div class="alert alert-info" style="margin-bottom:var(--space-md);">
+          ✅ 確認以下行程資訊後，點擊「建立行程」即可開始規劃！
+        </div>
+        <div class="card" style="background:var(--color-secondary);">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);font-size:14px;">
+            <div>
+              <div class="form-label">行程名稱</div>
+              <div style="font-weight:600;color:var(--color-text-main);" id="confirm-name">—</div>
+            </div>
+            <div>
+              <div class="form-label">出發車站</div>
+              <div style="font-weight:600;color:var(--color-text-main);" id="confirm-station">—</div>
+            </div>
+            <div>
+              <div class="form-label">出發日期</div>
+              <div style="font-weight:600;" id="confirm-start">—</div>
+            </div>
+            <div>
+              <div class="form-label">返回日期</div>
+              <div style="font-weight:600;" id="confirm-end">—</div>
+            </div>
+            <div>
+              <div class="form-label">行程天數</div>
+              <div style="font-weight:600;" id="confirm-days">—</div>
+            </div>
+            <div>
+              <div class="form-label">預估預算</div>
+              <div style="font-weight:600;" id="confirm-budget">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost"   id="modal-back-btn"   onclick="prevStep()" style="display:none;">← 上一步</button>
+      <button class="btn btn-outline" onclick="closeCreateModal()">取消</button>
+      <button class="btn btn-primary" id="modal-next-btn"   onclick="nextStep()">下一步 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     刪除確認 Modal
+══════════════════════════════════════════════ -->
+<div class="modal-backdrop hidden" id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title" id="delete-modal-title">刪除行程</h2>
+      <button class="modal-close" onclick="closeDeleteModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--color-text-sub);line-height:1.8;">
+        確定要刪除「<span class="delete-confirm-name" id="delete-trip-name"></span>」嗎？<br>
+        <span style="font-size:13px;">此操作無法復原，行程內所有資料將一併刪除。</span>
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeDeleteModal()">取消</button>
+      <button class="btn btn-danger"  onclick="confirmDelete()">確認刪除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     Toast 容器
+══════════════════════════════════════════════ -->
+<div class="toast-container" id="toast-container"></div>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+/* ────────────────────────────────────────────
+   頁面保護
+──────────────────────────────────────────── */
+const currentUser = getCurrentUser();
+if (!currentUser) window.location.href = 'login.html';
+
+/* ────────────────────────────────────────────
+   狀態
+──────────────────────────────────────────── */
+let currentFilter  = 'all';
+let deletingTripId = null;
+let createStep     = 1;
+
+/* ────────────────────────────────────────────
+   工具：日期格式化
+──────────────────────────────────────────── */
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+function diffDays(start, end) {
+  const ms = new Date(end+'T00:00:00') - new Date(start+'T00:00:00');
+  return Math.max(1, Math.round(ms / 86400000) + 1);
+}
+
+/* ────────────────────────────────────────────
+   狀態標籤
+──────────────────────────────────────────── */
+const STATUS_MAP = {
+  planning:  { label: '規劃中', cls: 'badge-warning'  },
+  completed: { label: '已完成', cls: 'badge-success'  },
+  cancelled: { label: '已取消', cls: 'badge-neutral'  },
+};
+
+/* ────────────────────────────────────────────
+   篩選
+──────────────────────────────────────────── */
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === f);
+  });
+  renderList();
+}
+
+/* ────────────────────────────────────────────
+   渲染行程列表
+──────────────────────────────────────────── */
+function renderList() {
+  const allTrips = getTripsByUser(currentUser.id);
+  const trips = currentFilter === 'all'
+    ? allTrips
+    : allTrips.filter(t => t.status === currentFilter);
+
+  const countEl = document.getElementById('trip-count-text');
+  countEl.textContent = `共 ${allTrips.length} 個行程` + (currentFilter !== 'all' ? `，目前顯示 ${trips.length} 個` : '');
+
+  const listEl = document.getElementById('trip-list');
+
+  if (trips.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🗺️</div>
+        <div class="empty-state-title">
+          ${currentFilter === 'all' ? '還沒有行程' : '沒有符合的行程'}
+        </div>
+        <div class="empty-state-desc">
+          ${currentFilter === 'all'
+            ? '立即建立第一個旅程，開啟你的中彰投之旅！'
+            : '試試其他篩選條件，或建立新行程。'}
+        </div>
+        ${currentFilter === 'all'
+          ? `<button class="btn btn-primary" onclick="openCreateModal()">＋ 建立新行程</button>`
+          : ''}
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = trips.map(trip => tripCardHTML(trip)).join('');
+}
+
+function tripCardHTML(trip) {
+  const startDate  = new Date(trip.startDate + 'T00:00:00');
+  const month      = startDate.toLocaleString('zh-TW', { month: 'short' }).replace('月','');
+  const day        = startDate.getDate();
+  const days       = diffDays(trip.startDate, trip.endDate);
+  const statusInfo = STATUS_MAP[trip.status] || STATUS_MAP.planning;
+  const memberCount = trip.members ? trip.members.length : 1;
+
+  const hasTickets  = trip.tickets  && trip.tickets.length  > 0;
+  const hasBookings = trip.bookings && trip.bookings.length > 0;
+
+  const totalExpense = (trip.expenses || []).reduce((s, e) => s + e.amount, 0);
+
+  const integratedTags = [
+    hasTickets  ? '<span class="trip-tag-integrated">🚂 已訂票</span>' : '',
+    hasBookings ? '<span class="trip-tag-integrated">🏠 已訂房</span>' : '',
+  ].filter(Boolean).join('');
+
+  return `
+    <div class="trip-card" data-id="${trip.id}">
+
+      <!-- 日期方塊 -->
+      <div class="trip-date-box">
+        <div class="trip-date-month">${month}月</div>
+        <div class="trip-date-day">${day}</div>
+      </div>
+
+      <!-- 行程資訊 -->
+      <div>
+        <div class="trip-name-row">
+          <span class="trip-name">${escHtml(trip.name)}</span>
+          <span class="badge ${statusInfo.cls}">${statusInfo.label}</span>
+          <span class="badge badge-neutral">👥 ${memberCount} 人</span>
+        </div>
+        <div class="trip-meta">
+          <span class="trip-meta-item">📍 ${escHtml(trip.station || '未設定')}</span>
+          <span class="trip-meta-item">📅 ${fmtDate(trip.startDate)} — ${fmtDate(trip.endDate)}</span>
+          <span class="trip-meta-item">🗓 ${days} 天</span>
+        </div>
+        <div class="trip-tags">
+          ${integratedTags}
+          <span class="trip-budget">預估花費：<strong>NT$ ${totalExpense.toLocaleString()}</strong>
+            ${trip.budget ? ` / 預算 NT$ ${Number(trip.budget).toLocaleString()}` : ''}
+          </span>
+        </div>
+      </div>
+
+      <!-- 操作按鈕 -->
+      <div class="trip-actions">
+        <a href="trip-edit.html?id=${trip.id}" class="btn btn-primary btn-sm">進入行程</a>
+        <div class="dropdown">
+          <button class="btn btn-ghost btn-sm" onclick="toggleMoreMenu(event,'more-${trip.id}')"
+                  aria-haspopup="true" aria-label="更多操作">⋯ 更多</button>
+          <div class="dropdown-menu hidden" id="more-${trip.id}">
+            <a href="trip-edit.html?id=${trip.id}" class="dropdown-item">✏️ 編輯行程</a>
+            <a href="trip-readonly.html?id=${trip.id}" class="dropdown-item" target="_blank">🔗 分享行程</a>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item danger" onclick="openDeleteModal('${trip.id}','${escAttr(trip.name)}')">🗑 刪除行程</button>
+          </div>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+/* ────────────────────────────────────────────
+   更多選單切換（阻止事件冒泡）
+──────────────────────────────────────────── */
+function toggleMoreMenu(e, menuId) {
+  e.stopPropagation();
+  document.querySelectorAll('.dropdown-menu').forEach(m => {
+    if (m.id !== menuId) m.classList.add('hidden');
+  });
+  document.getElementById(menuId).classList.toggle('hidden');
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+});
+
+/* ────────────────────────────────────────────
+   建立行程 Modal
+──────────────────────────────────────────── */
+function openCreateModal() {
+  createStep = 1;
+  resetCreateForm();
+  updateStepUI();
+  document.getElementById('create-modal').classList.remove('hidden');
+  document.getElementById('new-trip-name').focus();
+}
+function closeCreateModal() {
+  document.getElementById('create-modal').classList.add('hidden');
+}
+
+function resetCreateForm() {
+  document.getElementById('new-trip-name').value    = '';
+  document.getElementById('new-trip-start').value   = '';
+  document.getElementById('new-trip-end').value     = '';
+  document.getElementById('new-trip-budget').value  = '';
+  document.getElementById('new-trip-station').value = '';
+  hideError('step1-error');
+  hideError('step2-error');
+
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('new-trip-start').min = today;
+  document.getElementById('new-trip-end').min   = today;
+}
+
+function updateStepUI() {
+  // 顯示/隱藏步驟面板
+  [1,2,3].forEach(n => {
+    document.getElementById('create-step-' + n).style.display = n === createStep ? 'block' : 'none';
+  });
+
+  // 步驟指示器狀態
+  [1,2,3].forEach(n => {
+    const el  = document.getElementById('step-ind-' + n);
+    const cir = el.querySelector('.step-circle');
+    el.classList.remove('active','done');
+    if (n < createStep)       { el.classList.add('done');   cir.textContent = '✓'; }
+    else if (n === createStep){ el.classList.add('active');  cir.textContent = n;   }
+    else                      {                              cir.textContent = n;   }
+  });
+
+  // 上一步 / 下一步 按鈕
+  document.getElementById('modal-back-btn').style.display = createStep > 1 ? 'inline-flex' : 'none';
+  const nextBtn = document.getElementById('modal-next-btn');
+  if (createStep === 3) {
+    nextBtn.textContent = '✅ 建立行程';
+  } else {
+    nextBtn.textContent = '下一步 →';
+  }
+}
+
+function nextStep() {
+  if (createStep === 1) {
+    if (!validateStep1()) return;
+    createStep = 2;
+    updateStepUI();
+  } else if (createStep === 2) {
+    if (!validateStep2()) return;
+    fillConfirm();
+    createStep = 3;
+    updateStepUI();
+  } else if (createStep === 3) {
+    doCreateTrip();
+  }
+}
+function prevStep() {
+  if (createStep > 1) { createStep--; updateStepUI(); }
+}
+
+function validateStep1() {
+  const name  = document.getElementById('new-trip-name').value.trim();
+  const start = document.getElementById('new-trip-start').value;
+  const end   = document.getElementById('new-trip-end').value;
+  if (!name)  { showFormError('step1-error', '請輸入行程名稱'); return false; }
+  if (!start) { showFormError('step1-error', '請選擇出發日期'); return false; }
+  if (!end)   { showFormError('step1-error', '請選擇返回日期'); return false; }
+  if (end < start) { showFormError('step1-error', '返回日期不能早於出發日期'); return false; }
+  hideError('step1-error');
+  return true;
+}
+function validateStep2() {
+  const station = document.getElementById('new-trip-station').value;
+  if (!station) { showFormError('step2-error', '請選擇出發車站'); return false; }
+  hideError('step2-error');
+  return true;
+}
+
+function fillConfirm() {
+  const name    = document.getElementById('new-trip-name').value.trim();
+  const start   = document.getElementById('new-trip-start').value;
+  const end     = document.getElementById('new-trip-end').value;
+  const station = document.getElementById('new-trip-station').value;
+  const budget  = document.getElementById('new-trip-budget').value;
+  const days    = diffDays(start, end);
+
+  document.getElementById('confirm-name').textContent    = name;
+  document.getElementById('confirm-station').textContent = station;
+  document.getElementById('confirm-start').textContent   = fmtDate(start);
+  document.getElementById('confirm-end').textContent     = fmtDate(end);
+  document.getElementById('confirm-days').textContent    = days + ' 天';
+  document.getElementById('confirm-budget').textContent  = budget ? 'NT$ ' + Number(budget).toLocaleString() : '未設定';
+}
+
+function doCreateTrip() {
+  const name    = document.getElementById('new-trip-name').value.trim();
+  const start   = document.getElementById('new-trip-start').value;
+  const end     = document.getElementById('new-trip-end').value;
+  const station = document.getElementById('new-trip-station').value;
+  const budget  = Number(document.getElementById('new-trip-budget').value) || 0;
+
+  const newTrip = {
+    id:        generateId(),
+    name,
+    startDate: start,
+    endDate:   end,
+    station,
+    status:    'planning',
+    budget,
+    members: [{
+      userId:   currentUser.id,
+      name:     currentUser.name,
+      email:    currentUser.email,
+      role:     'owner',
+      joinedAt: new Date().toISOString(),
+    }],
+    items:     [],
+    expenses:  [],
+    tickets:   [],
+    bookings:  [],
+    messages:  [],
+    votes:     [],
+    logs: [{
+      id:        generateId(),
+      userId:    currentUser.id,
+      userName:  currentUser.name,
+      action:    '建立行程',
+      detail:    `建立了「${name}」`,
+      timestamp: new Date().toISOString(),
+    }],
+    ownerId:   currentUser.id,
+    createdAt: new Date().toISOString(),
+  };
+
+  saveTrip(newTrip);
+  closeCreateModal();
+  showToast('行程「' + name + '」已建立！', 'success');
+  renderList();
+}
+
+/* ────────────────────────────────────────────
+   刪除 Modal
+──────────────────────────────────────────── */
+function openDeleteModal(id, name) {
+  deletingTripId = id;
+  document.getElementById('delete-trip-name').textContent = name;
+  document.getElementById('delete-modal').classList.remove('hidden');
+  // 關閉更多選單
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+}
+function closeDeleteModal() {
+  deletingTripId = null;
+  document.getElementById('delete-modal').classList.add('hidden');
+}
+function confirmDelete() {
+  if (!deletingTripId) return;
+  const trip = getTripById(deletingTripId);
+  deleteTrip(deletingTripId);
+  closeDeleteModal();
+  showToast(`行程「${trip ? trip.name : ''}」已刪除`, 'error');
+  renderList();
+}
+
+/* ────────────────────────────────────────────
+   Escape 鍵關閉 Modal
+──────────────────────────────────────────── */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeCreateModal();
+  closeDeleteModal();
+});
+
+/* 出發日期變更時同步 end min */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('new-trip-start').addEventListener('change', function() {
+    document.getElementById('new-trip-end').min   = this.value;
+    document.getElementById('new-trip-end').value = '';
+  });
+});
+
+/* ────────────────────────────────────────────
+   表單錯誤
+──────────────────────────────────────────── */
+function showFormError(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError(id) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+
+/* ────────────────────────────────────────────
+   Toast
+──────────────────────────────────────────── */
+function showToast(msg, type = '') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+/* ────────────────────────────────────────────
+   XSS 防護
+──────────────────────────────────────────── */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escAttr(str) {
+  return String(str).replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+/* ────────────────────────────────────────────
+   初始化
+──────────────────────────────────────────── */
+renderNav();
+renderFooter();
+renderList();
+</script>
 </body>
 </html>
