@@ -5,16 +5,497 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 景點探索</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    .explore-header {
+      background: #fff;
+      border-bottom: 1px solid var(--color-border-light);
+      padding: var(--space-lg) 0;
+    }
+    .content-area { padding: var(--space-xl) 0 100px; }
+
+    /* ── 景點卡片格線 ── */
+    .attraction-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--space-lg);
+    }
+
+    .attraction-card {
+      background: #fff;
+      border: 2px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+      position: relative;
+      user-select: none;
+    }
+    .attraction-card:hover {
+      border-color: var(--color-border);
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+    .attraction-card.selected {
+      border-color: var(--color-accent-red);
+      box-shadow: 0 0 0 3px rgba(196,81,74,0.15);
+    }
+
+    /* 選取勾勾 */
+    .attraction-check {
+      position: absolute;
+      top: 10px; right: 10px;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.92);
+      border: 2px solid var(--color-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      transition: all var(--transition);
+      z-index: 1;
+    }
+    .attraction-card.selected .attraction-check {
+      background: var(--color-accent-red);
+      border-color: var(--color-accent-red);
+      color: #fff;
+    }
+
+    /* 景點縮圖 */
+    .attraction-thumb {
+      height: 110px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 52px;
+      position: relative;
+    }
+    .attraction-type-badge {
+      position: absolute;
+      bottom: 8px; left: 10px;
+      font-size: 11px; padding: 2px 8px;
+      border-radius: var(--radius-xl);
+      font-weight: 500;
+    }
+
+    /* 景點內容 */
+    .attraction-body { padding: 14px 16px 16px; }
+    .attraction-name { font-size: 15px; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px; }
+    .attraction-desc { font-size: 12px; color: var(--color-text-sub); line-height: 1.65; margin-bottom: 10px; min-height: 38px; }
+    .attraction-meta {
+      display: flex; gap: var(--space-md);
+      font-size: 12px; color: var(--color-text-light);
+    }
+
+    /* ── 已選浮動欄 ── */
+    .selection-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--color-primary);
+      color: #fff;
+      padding: 14px var(--space-xl);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 90;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+    }
+    .selection-bar.visible { transform: translateY(0); }
+    .selection-count { font-size: 15px; font-weight: 600; }
+    .selection-names {
+      font-size: 12px; color: #C5B886; margin-top: 2px;
+      max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .selection-bar-btns { display: flex; gap: var(--space-sm); flex-shrink: 0; }
+
+    /* 排序 */
+    .sort-select {
+      padding: 6px 28px 6px 10px;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-family: var(--font-main);
+      color: var(--color-text-main);
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B6354' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+      appearance: none;
+      cursor: pointer;
+    }
+    .skip-link {
+      font-size: 13px; color: var(--color-text-light);
+      text-decoration: underline; cursor: pointer;
+    }
+    .skip-link:hover { color: var(--color-text-sub); }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<div id="app">
+
+  <!-- 頁首 -->
+  <div class="explore-header">
+    <div class="page-container">
+      <div class="breadcrumb">
+        <div class="breadcrumb-item"><a href="trip-list.html">我的行程</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item current" id="trip-breadcrumb">景點探索</div>
+      </div>
+
+      <!-- 步驟指示器 -->
+      <div class="stepper" style="max-width:480px;margin-bottom:var(--space-md);">
+        <div class="step done">
+          <div class="step-circle">✓</div>
+          <div class="step-label">基本資訊</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">2</div>
+          <div class="step-label">探索景點</div>
+        </div>
+        <div class="step">
+          <div class="step-circle">3</div>
+          <div class="step-label">開始編排</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <h1 style="font-size:22px;font-weight:700;color:var(--color-text-main);" id="page-title">
+          探索附近景點
+        </h1>
+        <span class="skip-link" onclick="skipToEdit()">略過，直接開始編排 →</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主內容 -->
+  <div class="content-area">
+    <div class="page-container">
+
+      <!-- 篩選列 + 排序 + 計數 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-md);">
+        <div class="filter-bar" id="type-filter-bar" role="group" aria-label="景點類型篩選" style="margin-bottom:0;">
+          <button class="filter-btn active" data-type="all"        onclick="setTypeFilter('all')">全部</button>
+          <button class="filter-btn"        data-type="attraction" onclick="setTypeFilter('attraction')">🏛 景點</button>
+          <button class="filter-btn"        data-type="restaurant" onclick="setTypeFilter('restaurant')">🍽 餐廳</button>
+          <button class="filter-btn"        data-type="nature"     onclick="setTypeFilter('nature')">🌿 自然</button>
+          <button class="filter-btn"        data-type="shopping"   onclick="setTypeFilter('shopping')">🛍 購物</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--space-md);">
+          <span style="font-size:13px;color:var(--color-text-sub);">
+            已選 <strong id="selected-n-inline">0</strong> 個景點
+          </span>
+          <select class="sort-select" id="sort-select" onchange="renderCards()" aria-label="排序方式">
+            <option value="distance">距離由近到遠</option>
+            <option value="duration">停留時間由短到長</option>
+            <option value="name">名稱排序</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 景點格線 -->
+      <div class="attraction-grid" id="attraction-grid"></div>
+
+      <!-- 空狀態 -->
+      <div class="empty-state hidden" id="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <div class="empty-state-title">沒有符合的景點</div>
+        <div class="empty-state-desc">試試其他類型篩選</div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- end #app -->
+
+<!-- ── 已選浮動欄 ── -->
+<div class="selection-bar" id="selection-bar" role="status" aria-live="polite">
+  <div>
+    <div class="selection-count">已選 <span id="selected-count">0</span> 個景點</div>
+    <div class="selection-names" id="selected-names"></div>
+  </div>
+  <div class="selection-bar-btns">
+    <button class="btn btn-ghost btn-sm" style="color:#C5B886;border-color:rgba(255,255,255,0.2);"
+            onclick="clearSelection()">清除選取</button>
+    <button class="btn btn-yellow" onclick="addToTrip()">加入行程並開始編排 →</button>
+  </div>
+</div>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+/* ────────────────────────────────────────────
+   頁面保護 & URL 參數
+──────────────────────────────────────────── */
+const currentUser = getCurrentUser();
+if (!currentUser) window.location.href = 'login.html';
+
+const params  = new URLSearchParams(window.location.search);
+const tripId  = params.get('tripId')  || '';
+const station = decodeURIComponent(params.get('station') || '');
+
+const trip = tripId ? getTripById(tripId) : null;
+if (!trip) {
+  alert('找不到行程，請重新建立。');
+  window.location.href = 'trip-list.html';
+}
+
+document.getElementById('page-title').textContent =
+  station ? `探索 ${station} 附近景點` : '探索附近景點';
+document.getElementById('trip-breadcrumb').textContent =
+  (trip ? trip.name + ' — ' : '') + '景點探索';
+
+/* ────────────────────────────────────────────
+   景點資料庫
+──────────────────────────────────────────── */
+const ATTRACTION_DB = {
+  '集集站': [
+    { id:'a01', name:'集集車站',       type:'attraction', emoji:'🚉', desc:'百年日式木造車站，全台最美小站之一，建於1933年，是集集的地標。',      distance:0.1, duration:60  },
+    { id:'a02', name:'集集香蕉餐廳',   type:'restaurant', emoji:'🍌', desc:'以集集名產香蕉入菜的特色餐廳，必點香蕉特餐與香蕉冰。',               distance:0.3, duration:90  },
+    { id:'a03', name:'集集特產街',     type:'shopping',   emoji:'🛍', desc:'販售集集在地農特產、手工藝品與小吃，是採購伴手禮的好去處。',          distance:0.2, duration:45  },
+    { id:'a04', name:'明新書院',       type:'attraction', emoji:'🏛', desc:'建於清朝的百年古廟，見證集集歷史與文化，廟埕廣大氣派。',              distance:0.5, duration:45  },
+    { id:'a05', name:'濁水溪河濱公園', type:'nature',     emoji:'🌊', desc:'濁水溪旁寬廣的河濱公園，適合散步、騎自行車，視野開闊。',             distance:0.8, duration:60  },
+    { id:'a06', name:'車埕木業村',     type:'attraction', emoji:'🪵', desc:'昔日木業重鎮，現為特色文創小鎮，有木業展示館與特色商店。',           distance:12,  duration:120 },
+    { id:'a07', name:'集集綠色隧道',   type:'nature',     emoji:'🌿', desc:'兩側樟樹形成的天然隧道，全長約4.5公里，騎車散步的絕佳路線。',        distance:1.2, duration:90  },
+    { id:'a08', name:'武昌宮',         type:'attraction', emoji:'⛩',  desc:'供奉玄天上帝的廟宇，921地震後重建，見證台灣的韌性。',                distance:0.6, duration:30  },
+  ],
+  '彰化站': [
+    { id:'b01', name:'彰化扇形車庫',   type:'attraction', emoji:'🏭', desc:'全台碩果僅存的扇形車庫，見證台灣鐵道百年歷史，假日開放參觀。',         distance:0.3, duration:90  },
+    { id:'b02', name:'彰化肉圓老店',   type:'restaurant', emoji:'🥟', desc:'在地必吃的彰化肉圓，外皮Q彈、餡料飽滿，已傳承數十年的老滋味。',     distance:0.5, duration:60  },
+    { id:'b03', name:'彰化孔廟',       type:'attraction', emoji:'🏛', desc:'台灣現存最完整的孔廟之一，每年祭孔大典莊嚴隆重，值得一訪。',         distance:0.8, duration:60  },
+    { id:'b04', name:'彰化文化廣場',   type:'attraction', emoji:'🎭', desc:'市中心的文化藝術空間，定期舉辦展覽與活動。',                         distance:0.6, duration:45  },
+    { id:'b05', name:'八卦山大佛',     type:'nature',     emoji:'⛰',  desc:'俯瞰彰化市區的制高點，大佛像是著名地標，可遠眺彰化平原。',           distance:2.5, duration:90  },
+    { id:'b06', name:'彰化花市',       type:'shopping',   emoji:'🌸', desc:'規模龐大的花卉市場，品種繁多、價格實惠，花卉愛好者不可錯過。',       distance:1.0, duration:60  },
+  ],
+  '車埕站': [
+    { id:'c01', name:'車埕木業展示館', type:'attraction', emoji:'🪵', desc:'展示昔日伐木工業的歷史文物，了解車埕木業文化的最佳場所。',           distance:0.1, duration:60  },
+    { id:'c02', name:'車埕老街',       type:'shopping',   emoji:'🛒', desc:'保留舊時代風情的小街，特色工藝品與在地小吃讓人流連忘返。',           distance:0.2, duration:60  },
+    { id:'c03', name:'日月潭纜車入口', type:'attraction', emoji:'🚡', desc:'由車埕搭纜車可直達日月潭，提供壯觀的湖光山色空中視野。',             distance:1.5, duration:120 },
+    { id:'c04', name:'水里蛇窯',       type:'attraction', emoji:'🏺', desc:'百年窯廠，現為文化園區，可體驗手拉坯、參觀柴燒陶藝。',               distance:3.0, duration:90  },
+    { id:'c05', name:'溪頭自然教育園', type:'nature',     emoji:'🌲', desc:'台大實驗林的珍貴森林，空氣清新、步道豐富，是親近大自然的好去處。',   distance:18,  duration:180 },
+    { id:'c06', name:'車埕在地料理',   type:'restaurant', emoji:'🍱', desc:'以山產野菜入菜的在地料理，食材新鮮、風味獨特。',                   distance:0.3, duration:75  },
+  ],
+  '二水站': [
+    { id:'d01', name:'二水車站',       type:'attraction', emoji:'🚉', desc:'集集線的起點，保有舊式車站建築風貌，鐵道迷必訪打卡點。',             distance:0.0, duration:30  },
+    { id:'d02', name:'甘蔗田景觀區',   type:'nature',     emoji:'🌾', desc:'彰化著名甘蔗產地，秋冬季節可見廣大的甘蔗田景色。',                 distance:2.0, duration:45  },
+    { id:'d03', name:'二水農產直銷',   type:'shopping',   emoji:'🛒', desc:'在地農民直售新鮮蔬果，價格實惠。',                                 distance:0.5, duration:30  },
+    { id:'d04', name:'二水在地小吃',   type:'restaurant', emoji:'🍜', desc:'提供在地風味料理的小餐館，以新鮮食材入菜，味道樸實溫暖。',           distance:0.3, duration:60  },
+    { id:'d05', name:'源泉車站',       type:'attraction', emoji:'🚞', desc:'集集線小站，寧靜悠閒，是感受鄉村鐵道氣息的好地方。',               distance:3.5, duration:30  },
+    { id:'d06', name:'二水親水公園',   type:'nature',     emoji:'💧', desc:'以水為主題的公園，適合親子同遊，夏日戲水消暑。',                   distance:1.0, duration:60  },
+  ],
+  '水里站': [
+    { id:'e01', name:'水里蛇窯陶藝',   type:'attraction', emoji:'🏺', desc:'百年歷史的蛇形柴燒窯，現為陶藝文化園區，可體驗製陶樂趣。',           distance:0.5, duration:90  },
+    { id:'e02', name:'水里蜜餞老店',   type:'shopping',   emoji:'🍑', desc:'水里知名蜜餞老店，口味多樣、包裝精美，是送禮好選擇。',               distance:0.3, duration:30  },
+    { id:'e03', name:'玉峰橋',         type:'nature',     emoji:'🌉', desc:'跨越陳有蘭溪的景觀橋，可欣賞溪谷風光與遠山景色。',                 distance:0.8, duration:30  },
+    { id:'e04', name:'水里小吃街',     type:'restaurant', emoji:'🍜', desc:'聚集各式在地小吃，價格實惠，品嚐南投家鄉味。',                     distance:0.2, duration:60  },
+    { id:'e05', name:'車埕－水里步道', type:'nature',     emoji:'🥾', desc:'串連水里與車埕的健行步道，沿途風景優美。',                         distance:1.5, duration:120 },
+    { id:'e06', name:'水里市場',       type:'shopping',   emoji:'🛒', desc:'在地傳統市場，食材新鮮、生活氣息濃厚。',                           distance:0.4, duration:40  },
+  ],
+};
+
+const DEFAULT_ATTRACTIONS = [
+  { id:'z01', name:'車站廣場',     type:'attraction', emoji:'🏙', desc:'車站前的廣場，是旅遊的起點，周邊有各式商店與小吃。',               distance:0.0, duration:20  },
+  { id:'z02', name:'在地市場',     type:'shopping',   emoji:'🛒', desc:'販售在地農特產與手工藝品的傳統市場。',                             distance:0.3, duration:45  },
+  { id:'z03', name:'老街區',       type:'attraction', emoji:'🏘', desc:'保留舊時代風情的老街，充滿歷史感的建築與在地文化。',               distance:0.5, duration:60  },
+  { id:'z04', name:'在地餐廳',     type:'restaurant', emoji:'🍜', desc:'提供在地風味料理的餐廳，使用新鮮食材。',                           distance:0.4, duration:75  },
+  { id:'z05', name:'公園綠地',     type:'nature',     emoji:'🌳', desc:'適合散步休憩的城市公園，提供旅人喘息的空間。',                     distance:0.8, duration:45  },
+  { id:'z06', name:'特產伴手禮店', type:'shopping',   emoji:'🎁', desc:'販售當地名產與紀念品的伴手禮專門店。',                             distance:0.2, duration:30  },
+];
+
+/* ────────────────────────────────────────────
+   狀態
+──────────────────────────────────────────── */
+const allAttractions = ATTRACTION_DB[station] || DEFAULT_ATTRACTIONS;
+const selectedIds    = new Set();
+let   currentType    = 'all';
+
+const TYPE_CONFIG = {
+  attraction: { label:'景點', bg:'#E8F4ED', color:'#2C6B4A' },
+  restaurant: { label:'餐廳', bg:'#FBEAEA', color:'#C4514A' },
+  nature:     { label:'自然', bg:'#E8F0FA', color:'#1A4A8A' },
+  shopping:   { label:'購物', bg:'#F0E5BC', color:'#7A5A1A' },
+  activity:   { label:'活動', bg:'#F3E8FA', color:'#6B2DA0' },
+};
+const THUMB_BG = {
+  attraction: 'linear-gradient(135deg,#2C4A3E,#4A7A5F)',
+  restaurant: 'linear-gradient(135deg,#8B3A34,#C4514A)',
+  nature:     'linear-gradient(135deg,#2A5A20,#4A7A2F)',
+  shopping:   'linear-gradient(135deg,#7A5A1A,#C89430)',
+  activity:   'linear-gradient(135deg,#1A3A6A,#2B5DA0)',
+};
+
+/* ────────────────────────────────────────────
+   篩選
+──────────────────────────────────────────── */
+function setTypeFilter(type) {
+  currentType = type;
+  document.querySelectorAll('#type-filter-bar .filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+  renderCards();
+}
+
+/* ────────────────────────────────────────────
+   排序
+──────────────────────────────────────────── */
+function getSorted(list) {
+  const mode = document.getElementById('sort-select').value;
+  return [...list].sort((a, b) => {
+    if (mode === 'distance') return a.distance - b.distance;
+    if (mode === 'duration') return a.duration - b.duration;
+    return a.name.localeCompare(b.name, 'zh-TW');
+  });
+}
+
+/* ────────────────────────────────────────────
+   渲染卡片
+──────────────────────────────────────────── */
+function renderCards() {
+  const filtered = currentType === 'all'
+    ? allAttractions
+    : allAttractions.filter(a => a.type === currentType);
+  const sorted = getSorted(filtered);
+
+  const grid  = document.getElementById('attraction-grid');
+  const empty = document.getElementById('empty-state');
+
+  if (sorted.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  grid.innerHTML = sorted.map(a => {
+    const cfg = TYPE_CONFIG[a.type] || { label: a.type, bg: '#eee', color: '#666' };
+    const bg  = THUMB_BG[a.type]   || 'linear-gradient(135deg,#555,#777)';
+    const sel = selectedIds.has(a.id);
+    const dur = a.duration >= 60
+      ? Math.floor(a.duration/60) + '小時' + (a.duration % 60 ? (a.duration % 60) + '分' : '')
+      : a.duration + '分';
+
+    return `
+      <div class="attraction-card${sel ? ' selected' : ''}"
+           id="card-${a.id}"
+           onclick="toggleSelect('${a.id}')"
+           role="checkbox" aria-checked="${sel}" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSelect('${a.id}')}">
+
+        <div class="attraction-check">${sel ? '✓' : ''}</div>
+
+        <div class="attraction-thumb" style="background:${bg};">
+          <span>${a.emoji}</span>
+          <span class="attraction-type-badge"
+                style="background:${cfg.bg};color:${cfg.color};">${cfg.label}</span>
+        </div>
+
+        <div class="attraction-body">
+          <div class="attraction-name">${escHtml(a.name)}</div>
+          <div class="attraction-desc">${escHtml(a.desc)}</div>
+          <div class="attraction-meta">
+            <span>📍 ${a.distance} km</span>
+            <span>⏱ 約 ${dur}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ────────────────────────────────────────────
+   選取切換
+──────────────────────────────────────────── */
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else                      selectedIds.add(id);
+  updateSelectionUI();
+  renderCards();
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  updateSelectionUI();
+  renderCards();
+}
+
+function updateSelectionUI() {
+  const n = selectedIds.size;
+  const names = allAttractions
+    .filter(a => selectedIds.has(a.id))
+    .map(a => a.name)
+    .join('、');
+
+  document.getElementById('selected-n-inline').textContent = n;
+
+  const bar = document.getElementById('selection-bar');
+  bar.classList.toggle('visible', n > 0);
+  document.getElementById('selected-count').textContent = n;
+  document.getElementById('selected-names').textContent  = names;
+}
+
+/* ────────────────────────────────────────────
+   加入行程 → 跳轉 trip-edit.html
+──────────────────────────────────────────── */
+function addToTrip() {
+  if (selectedIds.size === 0) return;
+
+  const selected = allAttractions.filter(a => selectedIds.has(a.id));
+  const fresh    = getTripById(tripId);
+  if (!fresh) { alert('行程不存在，請重新建立。'); return; }
+
+  /* 從 day 1 現有項目後面接續 order */
+  const existingDay1 = (fresh.items || []).filter(i => i.day === 1);
+  let   nextOrder    = existingDay1.length + 1;
+
+  const newItems = selected.map(a => ({
+    id:              generateId(),
+    tripId,
+    day:             1,
+    type:            a.type,
+    name:            a.name,
+    time:            '',
+    endTime:         '',
+    note:            a.desc,
+    priority:        'candidate',
+    order:           nextOrder++,
+    linkedTicketId:  null,
+    linkedBookingId: null,
+  }));
+
+  fresh.items = [...(fresh.items || []), ...newItems];
+  fresh.logs  = fresh.logs || [];
+  fresh.logs.push({
+    id:        generateId(),
+    userId:    currentUser.id,
+    userName:  currentUser.name,
+    action:    '新增景點',
+    detail:    `從探索頁加入 ${newItems.length} 個景點：${selected.map(a => a.name).join('、')}`,
+    timestamp: new Date().toISOString(),
+  });
+
+  saveTrip(fresh);
+  window.location.href = `trip-edit.html?id=${tripId}`;
+}
+
+/* ────────────────────────────────────────────
+   略過
+──────────────────────────────────────────── */
+function skipToEdit() {
+  window.location.href = `trip-edit.html?id=${tripId}`;
+}
+
+/* ────────────────────────────────────────────
+   XSS 防護
+──────────────────────────────────────────── */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ────────────────────────────────────────────
+   初始化
+──────────────────────────────────────────── */
+renderNav();
+renderFooter();
+renderCards();
+updateSelectionUI();
+</script>
 </body>
 </html>

@@ -614,8 +614,8 @@ function doCreateTrip() {
 
   saveTrip(newTrip);
   closeCreateModal();
-  showToast('行程「' + name + '」已建立！', 'success');
-  renderList();
+  // 跳轉到景點探索頁
+  window.location.href = `trip-explore.html?tripId=${newTrip.id}&station=${encodeURIComponent(station)}`;
 }
 
 /* ────────────────────────────────────────────
