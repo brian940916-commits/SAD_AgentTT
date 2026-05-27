@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent TT — 登入 / 註冊</title>
+  <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* 登入頁專用樣式 */
+    body { background: #2C4A3E; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+    .login-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+      max-width: 960px;
+      min-height: 620px;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.35);
+    }
+
+    /* ── 左欄 ── */
+    .login-left {
+      background: #2C4A3E;
+      padding: 48px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .login-left-content { position: relative; z-index: 1; text-align: center; }
+    .login-eyebrow { font-size: 11px; color: #C5B886; letter-spacing: 4px; margin-bottom: 20px; text-transform: uppercase; }
+    .login-tagline { font-size: 28px; font-weight: 700; color: #FAF6EC; line-height: 1.55; margin-bottom: 16px; }
+    .login-divider-bar { width: 40px; height: 2px; background: #E8C547; margin: 0 auto 20px; }
+    .login-subtitle { font-size: 13px; color: #C5B886; line-height: 2; letter-spacing: 1px; }
+
+    /* ── 右欄 ── */
+    .login-right {
+      background: #FFFFFF;
+      padding: 40px 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow-y: auto;
+    }
+    .login-logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+    .login-logo-name { font-size: 18px; font-weight: 700; color: #2C4A3E; letter-spacing: 1px; }
+
+    /* 身份卡片 */
+    .role-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 24px; }
+    .role-card {
+      border: 2px solid #E0D5A8;
+      border-radius: var(--radius-md);
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition);
+      background: #FAFAF7;
+    }
+    .role-card:hover { border-color: #D4C896; background: #FAF6EC; }
+    .role-card.selected-guest  { border-color: #C4514A; background: #FBEAEA; }
+    .role-card.selected-host   { border-color: #2C4A3E; background: #E8F4ED; }
+    .role-card.selected-admin  { border-color: #1A3A2E; background: #DDE8E3; }
+    .role-icon  { font-size: 22px; margin-bottom: 4px; }
+    .role-label { font-size: 12px; font-weight: 600; color: #6B6354; }
+
+    /* Tab 切換 */
+    .form-tab-list { display: flex; border-bottom: 2px solid #E0D5A8; margin-bottom: 20px; }
+    .form-tab-btn {
+      flex: 1;
+      padding: 9px 0;
+      font-size: 14px;
+      font-weight: 500;
+      color: #8A8073;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer;
+      transition: color var(--transition), border-color var(--transition);
+    }
+    .form-tab-btn.active { color: #2C4A3E; border-bottom-color: #2C4A3E; font-weight: 700; }
+
+    /* 提示訊息 */
+    .admin-note {
+      font-size: 12px;
+      color: #6B6354;
+      background: #F0E5BC;
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* 社群登入 */
+    .social-divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: #8A8073; font-size: 12px; }
+    .social-divider::before, .social-divider::after { content: ''; flex: 1; height: 1px; background: #E0D5A8; }
+    .btn-social {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1.5px solid #D4C896;
+      border-radius: var(--radius-md);
+      background: #fff;
+      font-size: 14px;
+      color: #2C4A3E;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: background var(--transition), border-color var(--transition);
+      font-family: var(--font-main);
+    }
+    .btn-social:hover { background: #FAF6EC; border-color: #C5B886; }
+
+    /* 錯誤訊息 */
+    .error-msg { color: #C4514A; font-size: 13px; margin-top: 4px; display: none; }
+    .success-msg { color: #2C6B4A; font-size: 13px; margin-top: 4px; display: none; }
+
+    /* 手機登入區塊 */
+    #phone-login-section { display: none; }
+
+    /* 忘記密碼 */
+    .forgot-link { font-size: 12px; color: #8A8073; text-align: right; display: block; margin-top: -8px; margin-bottom: 16px; cursor: pointer; }
+    .forgot-link:hover { color: #2C4A3E; text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<div class="login-wrap">
+
+  <!-- ═══ 左欄：插圖 ═══ -->
+  <div class="login-left">
+    <!-- 背景裝飾 SVG -->
+    <svg style="position:absolute;bottom:0;left:0;width:100%;" height="280" viewBox="0 0 400 280" aria-hidden="true">
+      <!-- 山稜 -->
+      <path d="M0,160 Q70,110 140,130 T280,115 Q330,105 400,120 L400,280 L0,280 Z" fill="#3D6B52" opacity="0.55"/>
+      <path d="M0,195 Q100,168 200,178 T400,170 L400,280 L0,280 Z" fill="#4A7A5F" opacity="0.45"/>
+      <!-- 樹木 -->
+      <g transform="translate(28,88)">
+        <path d="M0,58 L26,6 L52,58 Z" fill="#5A7D4F" opacity="0.85"/>
+        <path d="M40,58 L68,18 L96,58 Z" fill="#4A6D3F" opacity="0.85"/>
+      </g>
+      <g transform="translate(270,78)">
+        <path d="M0,62 L28,10 L56,62 Z" fill="#5A7D4F" opacity="0.85"/>
+        <path d="M44,62 L68,24 L92,62 Z" fill="#4A6D3F" opacity="0.85"/>
+      </g>
+      <!-- 鐵軌 -->
+      <g transform="translate(120,185)">
+        <line x1="0" y1="0" x2="170" y2="0" stroke="#C5B886" stroke-width="2.5" stroke-dasharray="14 6" opacity="0.45"/>
+        <line x1="0" y1="10" x2="170" y2="10" stroke="#C5B886" stroke-width="2.5" stroke-dasharray="14 6" opacity="0.45"/>
+        <!-- 枕木 -->
+        <line x1="12"  y1="-4" x2="12"  y2="14" stroke="#C5B886" stroke-width="2" opacity="0.3"/>
+        <line x1="40"  y1="-4" x2="40"  y2="14" stroke="#C5B886" stroke-width="2" opacity="0.3"/>
+        <line x1="68"  y1="-4" x2="68"  y2="14" stroke="#C5B886" stroke-width="2" opacity="0.3"/>
+        <line x1="96"  y1="-4" x2="96"  y2="14" stroke="#C5B886" stroke-width="2" opacity="0.3"/>
+        <line x1="124" y1="-4" x2="124" y2="14" stroke="#C5B886" stroke-width="2" opacity="0.3"/>
+        <line x1="152" y1="-4" x2="152" y2="14" stroke="#C5B886" stroke-width="2" opacity="0.3"/>
+      </g>
+      <!-- 小火車 -->
+      <g transform="translate(152,155)">
+        <!-- 車廂 -->
+        <rect x="0" y="0" width="72" height="36" rx="5" fill="#C4514A" stroke="#8B3A34" stroke-width="1.2"/>
+        <!-- 車窗 -->
+        <rect x="6"  y="6" width="13" height="12" rx="2" fill="#FAEEDA" opacity="0.9"/>
+        <rect x="26" y="6" width="13" height="12" rx="2" fill="#FAEEDA" opacity="0.9"/>
+        <rect x="46" y="6" width="13" height="12" rx="2" fill="#FAEEDA" opacity="0.9"/>
+        <!-- 車頭燈 -->
+        <rect x="63" y="3" width="8" height="8" rx="2" fill="#E8C547"/>
+        <!-- 車輪 -->
+        <circle cx="18" cy="40" r="5" fill="#FAF6EC" stroke="#8B3A34" stroke-width="1"/>
+        <circle cx="54" cy="40" r="5" fill="#FAF6EC" stroke="#8B3A34" stroke-width="1"/>
+        <!-- 煙霧 -->
+        <circle cx="60" cy="-8"  r="5" fill="#FAF6EC" opacity="0.25"/>
+        <circle cx="68" cy="-14" r="7" fill="#FAF6EC" opacity="0.18"/>
+        <circle cx="78" cy="-20" r="9" fill="#FAF6EC" opacity="0.12"/>
+      </g>
+    </svg>
+
+    <div class="login-left-content">
+      <div class="login-eyebrow">Welcome to Agent TT</div>
+      <div class="login-tagline">乘著小火車<br>探索中彰投</div>
+      <div class="login-divider-bar"></div>
+      <div class="login-subtitle">集集 · 車埕 · 彰化<br>從一個小站開始你的旅程</div>
+    </div>
+  </div>
+
+  <!-- ═══ 右欄：表單 ═══ -->
+  <div class="login-right">
+
+    <!-- Logo -->
+    <div class="login-logo-row">
+      <svg width="32" height="32" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18" fill="#E8C547" stroke="#2C4A3E" stroke-width="1.5"/>
+        <text x="20" y="26" text-anchor="middle" font-size="15" font-weight="700"
+              fill="#2C4A3E" font-family="serif">TT</text>
+      </svg>
+      <div class="login-logo-name">Agent TT</div>
+    </div>
+
+    <!-- 身份選擇 -->
+    <div style="font-size:11px;color:#8A8073;letter-spacing:2px;margin-bottom:10px;">選擇登入身份</div>
+    <div class="role-cards" role="radiogroup" aria-label="登入身份">
+      <div class="role-card selected-guest" id="role-guest" onclick="selectRole('guest')"
+           role="radio" aria-checked="true" tabindex="0">
+        <div class="role-icon">🧳</div>
+        <div class="role-label">旅客</div>
+      </div>
+      <div class="role-card" id="role-host" onclick="selectRole('host')"
+           role="radio" aria-checked="false" tabindex="0">
+        <div class="role-icon">🏡</div>
+        <div class="role-label">房東</div>
+      </div>
+      <div class="role-card" id="role-admin" onclick="selectRole('admin')"
+           role="radio" aria-checked="false" tabindex="0">
+        <div class="role-icon">⚙️</div>
+        <div class="role-label">管理員</div>
+      </div>
+    </div>
+
+    <!-- 管理員提示 -->
+    <div class="admin-note" id="admin-note">🔒 管理員帳號由平台核發，請使用核發帳號登入</div>
+
+    <!-- Tab 列 -->
+    <div class="form-tab-list" id="form-tab-list">
+      <button class="form-tab-btn active" id="tab-login-btn" onclick="switchTab('login')">登入</button>
+      <button class="form-tab-btn"        id="tab-reg-btn"   onclick="switchTab('register')">註冊</button>
+    </div>
+
+    <!-- ── 登入表單 ── -->
+    <div id="tab-login">
+
+      <!-- Email 登入 -->
+      <div id="email-login-section">
+        <div class="form-group">
+          <label class="form-label" for="login-email">Email</label>
+          <input class="form-input" type="email" id="login-email" placeholder="your@email.com" autocomplete="email"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">密碼</label>
+          <input class="form-input" type="password" id="login-password" placeholder="請輸入密碼" autocomplete="current-password"/>
+        </div>
+        <a class="forgot-link" onclick="showForgot()">忘記密碼？</a>
+
+        <div class="error-msg"   id="login-error"></div>
+        <div class="success-msg" id="login-success"></div>
+
+        <button class="btn btn-primary btn-full" id="login-submit-btn" onclick="handleLogin()">
+          以旅客身份登入
+        </button>
+
+        <!-- 社群登入（UI 展示） -->
+        <div id="social-section">
+          <div class="social-divider">或</div>
+          <button class="btn-social" onclick="showSocialNotice()">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            使用 Google 帳號登入
+          </button>
+          <button class="btn-social" onclick="togglePhoneLogin()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" fill="#2C4A3E"/>
+            </svg>
+            使用手機號碼登入
+          </button>
+        </div>
+      </div>
+
+      <!-- 手機登入區塊 -->
+      <div id="phone-login-section">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+          <button class="btn btn-ghost btn-sm" onclick="togglePhoneLogin()" style="padding:4px 8px;">← 返回</button>
+          <span style="font-size:13px;color:#6B6354;">手機號碼登入</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-phone">手機號碼</label>
+          <input class="form-input" type="tel" id="login-phone" placeholder="09xx-xxx-xxx"/>
+        </div>
+        <div class="form-group" id="sms-code-group" style="display:none;">
+          <label class="form-label" for="login-sms">驗證碼</label>
+          <div style="display:flex;gap:8px;">
+            <input class="form-input" type="text" id="login-sms" placeholder="請輸入 6 位數驗證碼" maxlength="6"/>
+            <button class="btn btn-outline btn-sm" style="flex-shrink:0;white-space:nowrap;" id="resend-btn" onclick="startResendCountdown()">重新發送</button>
+          </div>
+        </div>
+        <div class="error-msg" id="phone-error"></div>
+        <button class="btn btn-primary btn-full" id="sms-btn" onclick="handleSendSMS()">發送驗證碼</button>
+        <p style="font-size:11px;color:#8A8073;margin-top:12px;text-align:center;">此功能為 UI 展示，不發送真實簡訊</p>
+      </div>
+    </div>
+
+    <!-- ── 註冊表單 ── -->
+    <div id="tab-register" style="display:none;">
+      <div class="form-group">
+        <label class="form-label" for="reg-name">姓名</label>
+        <input class="form-input" type="text" id="reg-name" placeholder="請輸入真實姓名" autocomplete="name"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="reg-phone">手機號碼</label>
+        <input class="form-input" type="tel" id="reg-phone" placeholder="09xx-xxx-xxx" autocomplete="tel"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="reg-email">Email</label>
+        <input class="form-input" type="email" id="reg-email" placeholder="your@email.com" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="reg-password">密碼</label>
+        <input class="form-input" type="password" id="reg-password" placeholder="至少 6 個字元" autocomplete="new-password"/>
+      </div>
+
+      <div class="error-msg"   id="reg-error"></div>
+      <div class="success-msg" id="reg-success"></div>
+
+      <button class="btn btn-primary btn-full" onclick="handleRegister()">建立帳號</button>
+      <p style="font-size:11px;color:#8A8073;margin-top:12px;text-align:center;">
+        註冊即表示同意 Agent TT 服務條款與隱私政策
+      </p>
+    </div>
+
+  </div><!-- end .login-right -->
+</div><!-- end .login-wrap -->
+
+<script src="shared-data.js"></script>
+<script>
+/* ── 狀態 ── */
+let currentRole = 'guest';
+
+/* ── 頁面保護：已登入直接跳轉 ── */
+(function guardPage() {
+  const user = getCurrentUser();
+  if (!user) return;
+  redirectByRole(user.role);
+})();
+
+/* ── 跳轉邏輯 ── */
+function redirectByRole(role) {
+  if (role === 'host')  { window.location.href = 'host-dashboard.html';  return; }
+  if (role === 'admin') { window.location.href = 'admin-platform.html'; return; }
+  window.location.href = 'index.html';
+}
+
+/* ── 身份選擇 ── */
+function selectRole(role) {
+  currentRole = role;
+
+  // 重置卡片
+  ['guest','host','admin'].forEach(r => {
+    const el = document.getElementById('role-' + r);
+    el.className = 'role-card';
+    el.setAttribute('aria-checked', 'false');
+  });
+
+  // 選取卡片
+  const card = document.getElementById('role-' + role);
+  card.className = 'role-card selected-' + role;
+  card.setAttribute('aria-checked', 'true');
+
+  // 按鈕文字
+  const btnText = { guest:'以旅客身份登入', host:'以房東身份登入', admin:'以管理員身份登入' };
+  const btn = document.getElementById('login-submit-btn');
+  if (btn) btn.textContent = btnText[role];
+
+  // 管理員特殊處理
+  const adminNote    = document.getElementById('admin-note');
+  const socialSect   = document.getElementById('social-section');
+  const tabRegBtn    = document.getElementById('tab-reg-btn');
+
+  if (role === 'admin') {
+    adminNote.style.display  = 'block';
+    socialSect.style.display = 'none';
+    tabRegBtn.style.display  = 'none';
+    switchTab('login');
+  } else {
+    adminNote.style.display  = 'none';
+    socialSect.style.display = 'block';
+    tabRegBtn.style.display  = '';
+  }
+
+  clearMessages();
+}
+
+/* ── Tab 切換 ── */
+function switchTab(tab) {
+  document.getElementById('tab-login').style.display    = tab === 'login'    ? 'block' : 'none';
+  document.getElementById('tab-register').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tab-login-btn').className    = 'form-tab-btn' + (tab === 'login'    ? ' active' : '');
+  document.getElementById('tab-reg-btn').className      = 'form-tab-btn' + (tab === 'register' ? ' active' : '');
+  clearMessages();
+}
+
+/* ── 錯誤/成功訊息 ── */
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function showSuccess(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function clearMessages() {
+  ['login-error','login-success','reg-error','reg-success','phone-error'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ''; el.style.display = 'none'; }
+  });
+}
+
+/* ── 登入邏輯 ── */
+function handleLogin() {
+  clearMessages();
+  const email    = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!email || !password) {
+    showError('login-error', '請填寫 Email 與密碼');
+    return;
+  }
+
+  const user = findUserByEmail(email);
+
+  if (!user || user.password !== password) {
+    showError('login-error', '帳號或密碼錯誤');
+    return;
+  }
+
+  // 身份卡片與實際 role 一致性提示（不強制阻擋，以實際 role 為準）
+  if (user.role !== currentRole) {
+    showError('login-error', `此帳號為「${roleName(user.role)}」身份，請切換正確身份後登入`);
+    return;
+  }
+
+  setCurrentUser(user);
+  showSuccess('login-success', '登入成功，跳轉中…');
+  setTimeout(() => redirectByRole(user.role), 600);
+}
+
+function roleName(role) {
+  return { guest:'旅客', host:'房東', admin:'管理員' }[role] || role;
+}
+
+/* ── Enter 鍵送出 ── */
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.id === 'login-email' || activeEl.id === 'login-password')) {
+    handleLogin();
+  }
+});
+
+/* ── 註冊邏輯 ── */
+function handleRegister() {
+  clearMessages();
+  const name     = document.getElementById('reg-name').value.trim();
+  const phone    = document.getElementById('reg-phone').value.trim();
+  const email    = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+
+  if (!name || !phone || !email || !password) {
+    showError('reg-error', '請填寫所有欄位');
+    return;
+  }
+  if (password.length < 6) {
+    showError('reg-error', '密碼至少需要 6 個字元');
+    return;
+  }
+  if (findUserByEmail(email)) {
+    showError('reg-error', '此 Email 已被註冊');
+    return;
+  }
+
+  const newUser = {
+    id:        generateId(),
+    name,
+    email,
+    phone,
+    password,
+    role:      'guest',
+    createdAt: new Date().toISOString(),
+  };
+  saveUser(newUser);
+  setCurrentUser(newUser);
+
+  showSuccess('reg-success', '註冊成功，跳轉中…');
+  setTimeout(() => redirectByRole('guest'), 800);
+}
+
+/* ── 忘記密碼（UI 展示）── */
+function showForgot() {
+  alert('請聯繫客服或管理員重設密碼。\n客服信箱：support@agent-tt.com');
+}
+
+/* ── 社群登入（UI 展示）── */
+function showSocialNotice() {
+  alert('Google 登入功能即將上線，敬請期待！');
+}
+
+/* ── 手機登入切換 ── */
+function togglePhoneLogin() {
+  const emailSection = document.getElementById('email-login-section');
+  const phoneSection = document.getElementById('phone-login-section');
+  const isPhone = phoneSection.style.display === 'block';
+  emailSection.style.display = isPhone ? 'block' : 'none';
+  phoneSection.style.display = isPhone ? 'none'  : 'block';
+  clearMessages();
+}
+
+let smsSent = false;
+function handleSendSMS() {
+  const phone = document.getElementById('login-phone').value.trim();
+  if (!phone) { showError('phone-error', '請輸入手機號碼'); return; }
+
+  if (!smsSent) {
+    // 顯示驗證碼欄位
+    document.getElementById('sms-code-group').style.display = 'block';
+    document.getElementById('sms-btn').textContent = '驗證並登入';
+    smsSent = true;
+    startResendCountdown();
+    showSuccess('phone-error', '');
+  } else {
+    const code = document.getElementById('login-sms').value.trim();
+    if (code !== '123456') { showError('phone-error', '驗證碼錯誤（展示用：123456）'); return; }
+    // 展示：找到符合手機號的帳號或給旅客測試帳號
+    const users = getUsers();
+    const user = users.find(u => u.phone === phone) || users.find(u => u.role === 'guest');
+    if (user) {
+      setCurrentUser(user);
+      showSuccess('phone-error', '登入成功，跳轉中…');
+      setTimeout(() => redirectByRole(user.role), 600);
+    } else {
+      showError('phone-error', '找不到對應帳號');
+    }
+  }
+}
+
+function startResendCountdown() {
+  let sec = 60;
+  const btn = document.getElementById('resend-btn');
+  if (!btn) return;
+  btn.disabled = true;
+  const timer = setInterval(() => {
+    sec--;
+    btn.textContent = `重新發送 (${sec}s)`;
+    if (sec <= 0) {
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = '重新發送';
+    }
+  }, 1000);
+}
+
+/* ── 角色卡片鍵盤支援 ── */
+document.querySelectorAll('.role-card').forEach(card => {
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      card.click();
+    }
+  });
+});
+</script>
+</body>
+</html>
