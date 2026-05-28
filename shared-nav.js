@@ -74,8 +74,8 @@ function _dropdownMenuByRole(role) {
 /* ── 右側使用者區塊 ───────────────────────────────────────── */
 function _rightSection(user) {
   if (!user) {
-    return `<a href="login.html" class="btn btn-outline btn-sm"
-              style="color:#FAF6EC;border-color:#FAF6EC;">登入</a>`;
+    return `<a href="login.html" class="btn btn-sm"
+              style="background:#E8C547;color:#2C4A3E;border:none;">登入</a>`;
   }
 
   return `
