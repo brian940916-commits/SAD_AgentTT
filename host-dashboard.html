@@ -414,6 +414,7 @@
   const currentUser = getCurrentUser();
   if (!currentUser || currentUser.role !== 'host') {
     window.location.href = 'login.html';
+    throw new Error('unauthorized');
   }
 
   /* ── 工具 ── */
