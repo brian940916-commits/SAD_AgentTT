@@ -219,6 +219,15 @@
 
     .empty-track { text-align: center; padding: 48px 20px; color: var(--color-text-light); }
     .empty-track .icon { font-size: 40px; margin-bottom: 12px; }
+
+  @media (max-width: 768px) {
+    .main-tabs { overflow-x: auto; flex-wrap: nowrap; }
+    .main-tab { padding: 10px 16px; white-space: nowrap; }
+    .chat-wrap { max-width: 100%; }
+    .chat-container { height: 420px; }
+    .chat-header-actions { flex-wrap: wrap; gap: 4px; }
+    .complaint-form-grid { grid-template-columns: 1fr; }
+  }
   </style>
 </head>
 <body>

@@ -147,6 +147,22 @@
     /* Toast */
     .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #1A3A2E; color: #fff; padding: 10px 24px; border-radius: var(--radius-xl); font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9999; }
     .toast.show { opacity: 1; }
+
+  @media (max-width: 768px) {
+    .dashboard-wrap { flex-direction: column; }
+    .sidebar {
+      width: 100%; height: auto; position: static;
+      padding: var(--space-sm) 0;
+      display: flex; flex-direction: row; overflow-x: auto;
+    }
+    .sidebar-logo { display: none; }
+    .sidebar-item { padding: 10px 16px; white-space: nowrap; border-left: none; border-bottom: 3px solid transparent; flex-direction: column; gap: 2px; font-size: 12px; }
+    .sidebar-item.active { border-left-color: transparent; border-bottom-color: var(--color-accent-red); }
+    .main-inner { padding: var(--space-md); }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .stat-num { font-size: 24px; }
+    .admin-card { flex-wrap: wrap; }
+  }
   </style>
 </head>
 <body>
