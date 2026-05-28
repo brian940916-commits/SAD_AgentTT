@@ -1,0 +1,5 @@
+# Old component drafts (not needed for deployment)
+agent_tt/
+
+# Windows Zone.Identifier metadata
+*.html:Zone.Identifier
