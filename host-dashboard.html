@@ -5,16 +5,871 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 房東後台</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── 整體佈局 ── */
+    .dashboard-wrap { display: flex; min-height: calc(100vh - 60px); }
+
+    /* ── 左側選單 ── */
+    .sidebar {
+      width: 220px; flex-shrink: 0;
+      background: var(--color-primary);
+      padding: var(--space-xl) 0;
+      position: sticky; top: 60px; height: calc(100vh - 60px);
+      overflow-y: auto;
+    }
+    .sidebar-logo { padding: 0 var(--space-lg) var(--space-lg); border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: var(--space-md); }
+    .sidebar-logo-title { font-size: 15px; font-weight: 700; color: #fff; }
+    .sidebar-logo-sub   { font-size: 12px; color: rgba(255,255,255,.6); margin-top: 2px; }
+    .sidebar-menu-item {
+      display: flex; align-items: center; gap: var(--space-sm);
+      padding: 12px var(--space-lg); font-size: 14px; font-weight: 500;
+      color: rgba(255,255,255,.75); cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all .15s; user-select: none;
+    }
+    .sidebar-menu-item:hover  { background: rgba(255,255,255,.08); color: #fff; }
+    .sidebar-menu-item.active { background: rgba(255,255,255,.12); color: #fff; border-left-color: var(--color-accent-yellow); }
+    .sidebar-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
+
+    /* ── 右側主內容 ── */
+    .main-content { flex: 1; background: #f7f5ef; min-width: 0; }
+    .main-inner   { padding: var(--space-xl); }
+    .section-page { display: none; }
+    .section-page.active { display: block; }
+
+    /* ── 頁面標題 ── */
+    .page-title-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--space-xl);
+    }
+    .page-title { font-size: 22px; font-weight: 700; color: var(--color-text-main); }
+
+    /* ── 房源卡片 ── */
+    .prop-host-card {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); padding: var(--space-md);
+      margin-bottom: var(--space-md);
+      display: flex; gap: var(--space-md); align-items: flex-start;
+    }
+    .prop-host-thumb {
+      width: 88px; height: 72px; border-radius: var(--radius-md);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; flex-shrink: 0;
+    }
+    .prop-host-body { flex: 1; min-width: 0; }
+    .prop-host-name { font-size: 16px; font-weight: 700; color: var(--color-text-main); margin-bottom: 4px; }
+    .prop-host-meta { font-size: 13px; color: var(--color-text-sub); margin-bottom: 8px; }
+    .prop-host-actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+
+    /* ── 新增/編輯房源面板 ── */
+    .add-prop-panel {
+      background: #fff; border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-lg); padding: var(--space-xl);
+      margin-bottom: var(--space-xl); display: none;
+    }
+    .add-prop-panel.open { display: block; }
+    .panel-title { font-size: 16px; font-weight: 700; color: var(--color-text-main); margin-bottom: var(--space-lg); display: flex; align-items: center; gap: 8px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-md); }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+    .form-group  { margin-bottom: var(--space-md); }
+    .form-label  { display: block; font-size: 13px; font-weight: 600; color: var(--color-text-sub); margin-bottom: 6px; }
+    .fac-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .fac-item { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+    .fac-item input { accent-color: var(--color-primary); }
+    .photo-drop {
+      border: 2px dashed var(--color-border); border-radius: var(--radius-md);
+      padding: var(--space-xl); text-align: center; cursor: pointer;
+      transition: border-color .15s;
+    }
+    .photo-drop:hover { border-color: var(--color-primary); }
+    .photo-drop p { font-size: 13px; color: var(--color-text-sub); margin: 4px 0 0; }
+    .photo-prev-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-sm); }
+    .photo-prev-img { width: 80px; height: 72px; object-fit: cover; border-radius: var(--radius-md); }
+
+    /* ── 定價月曆 ── */
+    .calendar-wrap { background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); overflow: hidden; margin-bottom: var(--space-xl); }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-md) var(--space-lg); background: var(--color-primary); color: #fff; }
+    .cal-nav { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm); transition: background .15s; }
+    .cal-nav:hover { background: rgba(255,255,255,.15); }
+    .cal-month-label { font-size: 16px; font-weight: 700; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .cal-weekday { text-align: center; padding: 8px; font-size: 12px; font-weight: 600; color: var(--color-text-sub); background: var(--color-secondary); }
+    .cal-day {
+      border: 1px solid #f0ede5; padding: 8px 4px;
+      text-align: center; cursor: pointer; min-height: 64px;
+      display: flex; flex-direction: column; align-items: center;
+      font-size: 13px; transition: background .15s; position: relative;
+    }
+    .cal-day.empty  { background: #f9f7f2; cursor: default; }
+    .cal-day.booked { background: #e8e4d8; cursor: not-allowed; color: var(--color-text-light); }
+    .cal-day.closed { background: #fdf0f0; }
+    .cal-day.open   { background: #f0faf4; }
+    .cal-day:not(.empty):not(.booked):hover { box-shadow: inset 0 0 0 2px var(--color-primary); }
+    .cal-day-num    { font-weight: 600; }
+    .cal-day-status { font-size: 10px; margin-top: 2px; }
+    .cal-day.booked .cal-day-status { color: var(--color-text-light); }
+    .cal-day.open   .cal-day-status { color: var(--color-success-text); }
+    .cal-day.closed .cal-day-status { color: var(--color-danger-text); }
+    .cal-legend { display: flex; gap: var(--space-lg); padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--color-border-light); font-size: 12px; color: var(--color-text-sub); }
+    .legend-dot { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+
+    /* 折扣規則 */
+    .discount-rule-card {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); padding: var(--space-lg);
+    }
+    .discount-rule-row { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-sm); font-size: 14px; }
+    .discount-rule-row input[type=number] { width: 70px; padding: 6px 8px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-main); }
+    .discount-rule-row input[type=number]:focus { outline: none; border-color: var(--color-primary); }
+
+    /* ── 訂單管理 ── */
+    .order-row {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md); padding: var(--space-md);
+      margin-bottom: var(--space-sm); display: flex; align-items: center;
+      gap: var(--space-md); flex-wrap: wrap;
+    }
+    .order-row-info { flex: 1; min-width: 0; }
+    .order-row-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
+    .order-row-meta { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
+    .order-row-price { font-size: 16px; font-weight: 700; color: var(--color-primary); flex-shrink: 0; }
+
+    /* ── 顧客訊息 ── */
+    .chat-layout { display: grid; grid-template-columns: 220px 1fr; gap: 0; background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); overflow: hidden; height: 540px; }
+    .conv-list { border-right: 1px solid var(--color-border-light); overflow-y: auto; }
+    .conv-item {
+      padding: 12px var(--space-md); border-bottom: 1px solid #f0ede5;
+      cursor: pointer; transition: background .15s;
+    }
+    .conv-item:hover { background: var(--color-secondary); }
+    .conv-item.active { background: #e8f0ec; }
+    .conv-name { font-size: 13px; font-weight: 600; color: var(--color-text-main); }
+    .conv-prop { font-size: 11px; color: var(--color-text-sub); margin-top: 2px; }
+    .conv-last { font-size: 12px; color: var(--color-text-light); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-main { display: flex; flex-direction: column; }
+    .chat-head { padding: 12px var(--space-md); border-bottom: 1px solid var(--color-border-light); background: var(--color-secondary); }
+    .chat-head-name { font-size: 14px; font-weight: 700; color: var(--color-text-main); }
+    .chat-head-prop { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: var(--space-md); }
+    .chat-msg       { display: flex; gap: 8px; margin-bottom: var(--space-sm); }
+    .chat-msg.mine  { flex-direction: row-reverse; }
+    .chat-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .chat-bubble { max-width: 220px; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+    .chat-msg:not(.mine) .chat-avatar { background: #e0e8e4; color: var(--color-primary); }
+    .chat-msg:not(.mine) .chat-bubble { background: #f5f3ec; color: var(--color-text-main); border-bottom-left-radius: 4px; }
+    .chat-msg.mine .chat-avatar { background: var(--color-primary); color: #fff; }
+    .chat-msg.mine .chat-bubble  { background: var(--color-primary); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-canned { padding: 6px var(--space-md); border-top: 1px solid #f0ede5; display: flex; gap: 4px; flex-wrap: wrap; }
+    .canned-chip { padding: 4px 10px; border: 1.5px solid var(--color-border); border-radius: var(--radius-xl); font-size: 11px; cursor: pointer; background: #fff; font-family: var(--font-main); color: var(--color-text-sub); transition: all .15s; }
+    .canned-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .chat-input-row { padding: 10px var(--space-md); border-top: 1px solid var(--color-border-light); display: flex; gap: var(--space-sm); }
+    .chat-input { flex: 1; border: 1.5px solid var(--color-border); border-radius: var(--radius-xl); padding: 7px 14px; font-size: 13px; font-family: var(--font-main); outline: none; transition: border-color .15s; }
+    .chat-input:focus { border-color: var(--color-primary); }
+    .chat-send { background: var(--color-primary); color: #fff; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    /* ── 狀態 badges ── */
+    .badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-xl); }
+    .badge-pending  { background: var(--color-warning); color: var(--color-warning-text); }
+    .badge-online   { background: var(--color-success); color: var(--color-success-text); }
+    .badge-offline  { background: #e0ddd5; color: var(--color-text-sub); }
+    .badge-paid     { background: var(--color-success); color: var(--color-success-text); }
+    .badge-cancelled{ background: var(--color-danger);  color: var(--color-danger-text); }
+    .badge-completed{ background: #E3F2FD; color: #1565C0; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #2C4A3E; color: #fff; padding: 10px 24px; border-radius: var(--radius-xl); font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9999; }
+    .toast.show { opacity: 1; }
+
+    .empty-msg { text-align: center; padding: var(--space-2xl); color: var(--color-text-light); font-size: 14px; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<div id="app">
+  <div class="dashboard-wrap">
+
+    <!-- ── 左側選單 ── -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-title">🏡 房東後台</div>
+        <div class="sidebar-logo-sub" id="host-name-sub">載入中…</div>
+      </div>
+      <nav>
+        <div class="sidebar-menu-item active" data-section="properties" onclick="showSection('properties')">
+          <span class="sidebar-icon">🏠</span>我的房源
+        </div>
+        <div class="sidebar-menu-item" data-section="pricing" onclick="showSection('pricing')">
+          <span class="sidebar-icon">📅</span>定價折扣
+        </div>
+        <div class="sidebar-menu-item" data-section="orders" onclick="showSection('orders')">
+          <span class="sidebar-icon">📋</span>訂單管理
+        </div>
+        <div class="sidebar-menu-item" data-section="messages" onclick="showSection('messages')">
+          <span class="sidebar-icon">💬</span>顧客訊息
+        </div>
+      </nav>
+    </aside>
+
+    <!-- ── 右側主內容 ── -->
+    <div class="main-content">
+      <div class="main-inner">
+
+        <!-- §1 我的房源 -->
+        <div class="section-page active" id="sec-properties">
+          <div class="page-title-row">
+            <div class="page-title">我的房源</div>
+            <button class="btn btn-primary btn-sm" onclick="toggleAddPanel()">＋ 新增房源</button>
+          </div>
+
+          <!-- 新增/編輯面板 -->
+          <div class="add-prop-panel" id="add-prop-panel">
+            <div class="panel-title" id="add-panel-title">🏠 新增房源</div>
+            <input type="hidden" id="edit-prop-id">
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">房源名稱 <span style="color:var(--color-accent-red)">*</span></label>
+                <input class="form-input" type="text" id="p-name" placeholder="例：集集車站旁民宿">
+              </div>
+              <div class="form-group">
+                <label class="form-label">最近車站 <span style="color:var(--color-accent-red)">*</span></label>
+                <select class="form-input" id="p-station">
+                  <option value="">請選擇車站</option>
+                  <option>集集站</option><option>車埕站</option><option>彰化站</option>
+                  <option>二水站</option><option>水里站</option><option>源泉站</option>
+                  <option>濁水站</option><option>龍泉站</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">房源描述</label>
+              <textarea class="form-input" id="p-desc" rows="3" placeholder="描述房源特色、周邊環境…"></textarea>
+            </div>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label class="form-label">房型</label>
+                <select class="form-input" id="p-roomtype">
+                  <option>雙人房</option><option>家庭房</option>
+                  <option>標準單人房</option><option>多人床位</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">入住時間</label>
+                <input class="form-input" type="time" id="p-checkin" value="15:00">
+              </div>
+              <div class="form-group">
+                <label class="form-label">退房時間</label>
+                <input class="form-input" type="time" id="p-checkout" value="11:00">
+              </div>
+            </div>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label class="form-label">平日售價（NT$）</label>
+                <input class="form-input" type="number" id="p-price-wd" placeholder="1800" min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">假日售價（NT$）</label>
+                <input class="form-input" type="number" id="p-price-we" placeholder="2400" min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label">國定假日售價（NT$）</label>
+                <input class="form-input" type="number" id="p-price-h" placeholder="2800" min="0">
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">最多入住人數</label>
+                <input class="form-input" type="number" id="p-guests" value="2" min="1" max="20">
+              </div>
+              <div class="form-group">
+                <label class="form-label">房間數量</label>
+                <input class="form-input" type="number" id="p-rooms" value="1" min="1">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">設備</label>
+              <div class="fac-grid">
+                <label class="fac-item"><input type="checkbox" value="Wi-Fi"> Wi-Fi</label>
+                <label class="fac-item"><input type="checkbox" value="冷氣"> 冷氣</label>
+                <label class="fac-item"><input type="checkbox" value="停車場"> 停車場</label>
+                <label class="fac-item"><input type="checkbox" value="早餐"> 早餐</label>
+                <label class="fac-item"><input type="checkbox" value="自行車租借"> 自行車租借</label>
+                <label class="fac-item"><input type="checkbox" value="木作體驗"> 木作體驗</label>
+                <label class="fac-item"><input type="checkbox" value="共用廚房"> 共用廚房</label>
+                <label class="fac-item"><input type="checkbox" value="行李寄放"> 行李寄放</label>
+                <label class="fac-item"><input type="checkbox" value="洗衣機"> 洗衣機</label>
+                <label class="fac-item"><input type="checkbox" value="電視"> 電視</label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">照片</label>
+              <label for="p-photos" class="photo-drop">
+                <div style="font-size:32px;">📷</div>
+                <p>點擊選擇照片（最多 5 張）</p>
+              </label>
+              <input type="file" id="p-photos" accept="image/*" multiple style="display:none;" onchange="previewPropPhotos(this)">
+              <div class="photo-prev-row" id="prop-photo-prev"></div>
+            </div>
+
+            <div id="add-prop-error" style="color:var(--color-accent-red);font-size:13px;margin-bottom:var(--space-sm);display:none;"></div>
+            <div style="display:flex;gap:var(--space-sm);justify-content:flex-end;">
+              <button class="btn btn-outline" onclick="toggleAddPanel()">取消</button>
+              <button class="btn btn-primary" onclick="savePropForm()">送出審核</button>
+            </div>
+          </div>
+
+          <!-- 房源列表 -->
+          <div id="prop-list"><!-- 動態填入 --></div>
+        </div>
+
+        <!-- §2 定價折扣 -->
+        <div class="section-page" id="sec-pricing">
+          <div class="page-title-row">
+            <div class="page-title">定價折扣</div>
+            <select class="form-input" id="pricing-prop-select" style="max-width:220px;" onchange="renderCalendar()">
+              <!-- 動態填入 -->
+            </select>
+          </div>
+
+          <!-- 月曆 -->
+          <div class="calendar-wrap">
+            <div class="cal-header">
+              <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+              <span class="cal-month-label" id="cal-month-label"></span>
+              <button class="cal-nav" onclick="changeMonth(1)">›</button>
+            </div>
+            <div class="cal-grid" id="cal-weekdays">
+              <div class="cal-weekday">日</div><div class="cal-weekday">一</div>
+              <div class="cal-weekday">二</div><div class="cal-weekday">三</div>
+              <div class="cal-weekday">四</div><div class="cal-weekday">五</div>
+              <div class="cal-weekday">六</div>
+            </div>
+            <div class="cal-grid" id="cal-body"><!-- 動態填入 --></div>
+            <div class="cal-legend">
+              <span style="display:flex;align-items:center;gap:4px;"><span class="legend-dot" style="background:#f0faf4;border:1px solid #A8D4B8;"></span>開放</span>
+              <span style="display:flex;align-items:center;gap:4px;"><span class="legend-dot" style="background:#fdf0f0;border:1px solid #F5A5A0;"></span>關閉</span>
+              <span style="display:flex;align-items:center;gap:4px;"><span class="legend-dot" style="background:#e8e4d8;border:1px solid #c8c0a0;"></span>已預訂</span>
+              <span style="font-size:12px;color:var(--color-text-light);">點擊日期切換開放/關閉</span>
+            </div>
+          </div>
+
+          <!-- 折扣規則 -->
+          <div class="discount-rule-card">
+            <div style="font-size:15px;font-weight:700;margin-bottom:var(--space-md);">折扣規則</div>
+            <div class="discount-rule-row">
+              <span style="min-width:80px;">連住</span>
+              <input type="number" id="disc-nights" value="2" min="1">
+              <span>晚以上，享</span>
+              <input type="number" id="disc-pct" value="90" min="50" max="99">
+              <span>% 優惠</span>
+              <button class="btn btn-outline btn-sm" onclick="saveDiscountRule()">儲存</button>
+            </div>
+            <div style="font-size:12px;color:var(--color-text-sub);margin-top:4px;">例：連住 2 晚以上享 9 折，連住 3 晚以上享 85 折</div>
+          </div>
+        </div>
+
+        <!-- §3 訂單管理 -->
+        <div class="section-page" id="sec-orders">
+          <div class="page-title-row">
+            <div class="page-title">訂單管理</div>
+          </div>
+          <div id="host-orders-list"><!-- 動態填入 --></div>
+        </div>
+
+        <!-- §4 顧客訊息 -->
+        <div class="section-page" id="sec-messages">
+          <div class="page-title-row">
+            <div class="page-title">顧客訊息</div>
+          </div>
+          <div class="chat-layout">
+            <div class="conv-list" id="conv-list"><!-- 動態填入 --></div>
+            <div class="chat-main" id="chat-main"><!-- 動態填入 --></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div id="footer-container"></div>
+
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+  renderNav();
+  renderFooter();
+
+  /* ── 頁面保護 ── */
+  const currentUser = getCurrentUser();
+  if (!currentUser || currentUser.role !== 'host') {
+    window.location.href = 'login.html';
+  }
+
+  /* ── 工具 ── */
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function showToast(msg, ms = 2400) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), ms);
+  }
+  function fmt(d) { return d ? d.toISOString().slice(0,10) : ''; }
+
+  /* ── 訊息 localStorage ── */
+  const MSG_KEY = 'agenttt_messages';
+  function getConvs()    { try { return JSON.parse(localStorage.getItem(MSG_KEY) || '[]'); } catch { return []; } }
+  function setConvs(c)   { localStorage.setItem(MSG_KEY, JSON.stringify(c)); }
+
+  /* ── 定價 localStorage ── */
+  const PRICE_KEY = 'agenttt_pricing';
+  function getPricing()  { try { return JSON.parse(localStorage.getItem(PRICE_KEY) || '{}'); } catch { return {}; } }
+  function setPricing(p) { localStorage.setItem(PRICE_KEY, JSON.stringify(p)); }
+
+  /* ── 房源展示 ── */
+  const PROP_THUMB = {
+    prop_01: { emoji: '🏡', bg: '#C8E6C9' },
+    prop_02: { emoji: '🌲', bg: '#D7CCC8' },
+    prop_03: { emoji: '🚂', bg: '#FFCDD2' },
+  };
+  function thumb(id) { return PROP_THUMB[id] || { emoji: '🏠', bg: '#f0ede5' }; }
+
+  /* ── 狀態 ── */
+  let hostProps     = [];
+  let hostBookings  = [];
+  let calYear       = new Date().getFullYear();
+  let calMonth      = new Date().getMonth();  // 0-based
+  let activePropId  = '';
+  let activeConvIdx = 0;
+  let convData      = [];
+  let editingPropId = '';
+
+  /* ════════════════════════════════
+     初始化
+  ════════════════════════════════ */
+  function init() {
+    document.getElementById('host-name-sub').textContent = currentUser.name;
+
+    // 讀取房源
+    hostProps = getProperties().filter(p => p.hostId === currentUser.id);
+
+    // 讀取訂單（屬於自己房源）
+    const propIds = new Set(hostProps.map(p => p.id));
+    hostBookings  = getBookings().filter(b => propIds.has(b.propertyId));
+
+    // 初始化對話（從訂房建立假對話）
+    initConversations();
+
+    activePropId = hostProps[0]?.id || '';
+    renderPropList();
+    renderPricingPropSelect();
+    renderCalendar();
+    renderHostOrders();
+    renderConvList();
+    renderChatMain();
+  }
+
+  /* ════════════════════════════════
+     §1 我的房源
+  ════════════════════════════════ */
+  function showSection(name) {
+    document.querySelectorAll('.section-page').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.sidebar-menu-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('sec-' + name).classList.add('active');
+    document.querySelector(`[data-section="${name}"]`).classList.add('active');
+  }
+
+  function toggleAddPanel(propId) {
+    const panel = document.getElementById('add-prop-panel');
+    const isOpen = panel.classList.contains('open');
+    if (isOpen && !propId) { panel.classList.remove('open'); return; }
+
+    // 重置或填入編輯資料
+    if (propId) {
+      const p = hostProps.find(hp => hp.id === propId);
+      if (!p) return;
+      editingPropId = propId;
+      document.getElementById('add-panel-title').textContent = '✏️ 編輯房源';
+      document.getElementById('edit-prop-id').value = propId;
+      document.getElementById('p-name').value      = p.name || '';
+      document.getElementById('p-station').value   = p.station || '';
+      document.getElementById('p-desc').value      = p.description || '';
+      document.getElementById('p-roomtype').value  = p.roomType || '雙人房';
+      document.getElementById('p-checkin').value   = p.checkInTime || '15:00';
+      document.getElementById('p-checkout').value  = p.checkOutTime || '11:00';
+      document.getElementById('p-price-wd').value  = p.priceWeekday || '';
+      document.getElementById('p-price-we').value  = p.priceWeekend || '';
+      document.getElementById('p-price-h').value   = p.priceHoliday || '';
+      document.getElementById('p-guests').value    = p.maxGuests || 2;
+      document.getElementById('p-rooms').value     = 1;
+      document.querySelectorAll('.fac-grid input[type=checkbox]').forEach(cb => {
+        cb.checked = (p.facilities || []).includes(cb.value);
+      });
+    } else {
+      editingPropId = '';
+      document.getElementById('add-panel-title').textContent = '🏠 新增房源';
+      document.getElementById('edit-prop-id').value = '';
+      ['p-name','p-desc','p-price-wd','p-price-we','p-price-h'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('p-station').value  = '';
+      document.getElementById('p-roomtype').value = '雙人房';
+      document.getElementById('p-checkin').value  = '15:00';
+      document.getElementById('p-checkout').value = '11:00';
+      document.getElementById('p-guests').value   = 2;
+      document.getElementById('p-rooms').value    = 1;
+      document.querySelectorAll('.fac-grid input[type=checkbox]').forEach(cb => cb.checked = false);
+      document.getElementById('prop-photo-prev').innerHTML = '';
+    }
+    panel.classList.add('open');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function savePropForm() {
+    const name    = document.getElementById('p-name').value.trim();
+    const station = document.getElementById('p-station').value;
+    const errEl   = document.getElementById('add-prop-error');
+
+    if (!name || !station) {
+      errEl.textContent = '房源名稱與車站為必填項目';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.style.display = 'none';
+
+    const facilities = [...document.querySelectorAll('.fac-grid input:checked')].map(cb => cb.value);
+    const isEdit     = !!editingPropId;
+    const existProp  = isEdit ? hostProps.find(p => p.id === editingPropId) : null;
+
+    const prop = {
+      id:           isEdit ? editingPropId : generateId(),
+      hostId:       currentUser.id,
+      name,
+      station,
+      description:  document.getElementById('p-desc').value.trim(),
+      roomType:     document.getElementById('p-roomtype').value,
+      checkInTime:  document.getElementById('p-checkin').value,
+      checkOutTime: document.getElementById('p-checkout').value,
+      maxGuests:    Number(document.getElementById('p-guests').value) || 2,
+      priceWeekday: Number(document.getElementById('p-price-wd').value) || 0,
+      priceWeekend: Number(document.getElementById('p-price-we').value) || 0,
+      priceHoliday: Number(document.getElementById('p-price-h').value) || 0,
+      facilities,
+      status:       isEdit ? (existProp?.status || 'pending') : 'pending',
+      rating:       existProp?.rating || 0,
+      reviewCount:  existProp?.reviewCount || 0,
+      createdAt:    existProp?.createdAt || nowISO(),
+    };
+
+    saveProperty(prop);
+    hostProps = getProperties().filter(p => p.hostId === currentUser.id);
+    document.getElementById('add-prop-panel').classList.remove('open');
+    renderPropList();
+    renderPricingPropSelect();
+    showToast(isEdit ? '✅ 房源資料已更新' : '✅ 房源已送出審核，待管理員核准後上線');
+  }
+
+  function renderPropList() {
+    const el = document.getElementById('prop-list');
+    if (!hostProps.length) {
+      el.innerHTML = `<div class="empty-msg">尚無房源，點擊「新增房源」開始刊登</div>`;
+      return;
+    }
+    el.innerHTML = hostProps.map(p => {
+      const th  = thumb(p.id);
+      const isPending = p.status === 'pending';
+      const statusMap = { pending:'badge-pending', online:'badge-online', offline:'badge-offline' };
+      const statusLbl = { pending:'待審核', online:'上線中', offline:'已下架' };
+      return `
+        <div class="prop-host-card">
+          <div class="prop-host-thumb" style="background:${th.bg};">${th.emoji}</div>
+          <div class="prop-host-body">
+            <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:4px;">
+              <div class="prop-host-name">${escHtml(p.name)}</div>
+              <span class="badge ${statusMap[p.status] || ''}">${statusLbl[p.status] || p.status}</span>
+            </div>
+            <div class="prop-host-meta">📍 ${escHtml(p.station)}・🏠 ${escHtml(p.roomType)}・平日 NT$ ${(p.priceWeekday||0).toLocaleString()} / 晚</div>
+            ${isPending ? `<div style="font-size:12px;color:var(--color-warning-text);margin-top:4px;">⏳ 等待管理員審核，審核通過後自動上線</div>` : ''}
+            <div class="prop-host-actions">
+              ${!isPending ? `<button class="btn btn-outline btn-sm" onclick="toggleAddPanel('${escHtml(p.id)}')">✏️ 編輯</button>` : ''}
+              ${p.status === 'online'  ? `<button class="btn btn-ghost btn-sm" onclick="setPropStatus('${escHtml(p.id)}','offline')">下架</button>` : ''}
+              ${p.status === 'offline' ? `<button class="btn btn-primary btn-sm" onclick="setPropStatus('${escHtml(p.id)}','online')">重新上架</button>` : ''}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function setPropStatus(propId, status) {
+    const props = getProperties();
+    const idx   = props.findIndex(p => p.id === propId);
+    if (idx >= 0) { props[idx].status = status; setData('agenttt_properties', props); }
+    hostProps = getProperties().filter(p => p.hostId === currentUser.id);
+    renderPropList();
+    showToast(status === 'online' ? '✅ 房源已重新上架' : '✅ 房源已下架');
+  }
+
+  function previewPropPhotos(input) {
+    const row = document.getElementById('prop-photo-prev');
+    row.innerHTML = '';
+    Array.from(input.files).slice(0, 5).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.className = 'photo-prev-img';
+        row.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ════════════════════════════════
+     §2 定價月曆
+  ════════════════════════════════ */
+  function renderPricingPropSelect() {
+    const sel = document.getElementById('pricing-prop-select');
+    sel.innerHTML = hostProps.map(p => `<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join('');
+    if (hostProps.length) activePropId = hostProps[0].id;
+  }
+
+  function changeMonth(delta) {
+    calMonth += delta;
+    if (calMonth < 0)  { calMonth = 11; calYear--; }
+    if (calMonth > 11) { calMonth = 0;  calYear++; }
+    renderCalendar();
+  }
+
+  function renderCalendar() {
+    const sel = document.getElementById('pricing-prop-select');
+    activePropId = sel?.value || activePropId;
+
+    const label = document.getElementById('cal-month-label');
+    label.textContent = `${calYear} 年 ${calMonth + 1} 月`;
+
+    // 此月已預訂日期
+    const bookedDates = new Set(
+      hostBookings
+        .filter(b => b.propertyId === activePropId && b.status !== 'cancelled')
+        .flatMap(b => {
+          const dates = [];
+          let d = new Date(b.checkIn + 'T00:00:00');
+          const end = new Date(b.checkOut + 'T00:00:00');
+          while (d < end) { dates.push(fmt(d)); d.setDate(d.getDate() + 1); }
+          return dates;
+        })
+    );
+
+    const pricing = getPricing();
+    const propPricing = pricing[activePropId] || {};
+
+    const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+    let html = '';
+    // 空格
+    for (let i = 0; i < firstDay; i++) html += `<div class="cal-day empty"></div>`;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const isBooked = bookedDates.has(dateStr);
+      const dayStatus = propPricing[dateStr] || 'open';
+      const cls = isBooked ? 'booked' : dayStatus;
+      const lbl = isBooked ? '已預訂' : (dayStatus === 'open' ? '開放' : '關閉');
+      html += `
+        <div class="cal-day ${cls}" data-date="${dateStr}" onclick="${isBooked ? '' : `toggleDayStatus('${dateStr}')`}">
+          <span class="cal-day-num">${d}</span>
+          <span class="cal-day-status">${lbl}</span>
+        </div>`;
+    }
+
+    document.getElementById('cal-body').innerHTML = html;
+  }
+
+  function toggleDayStatus(dateStr) {
+    const pricing = getPricing();
+    if (!pricing[activePropId]) pricing[activePropId] = {};
+    const cur = pricing[activePropId][dateStr] || 'open';
+    pricing[activePropId][dateStr] = cur === 'open' ? 'closed' : 'open';
+    setPricing(pricing);
+    renderCalendar();
+  }
+
+  function saveDiscountRule() {
+    showToast('✅ 折扣規則已儲存');
+  }
+
+  /* ════════════════════════════════
+     §3 訂單管理
+  ════════════════════════════════ */
+  function renderHostOrders() {
+    const el = document.getElementById('host-orders-list');
+    if (!hostBookings.length) {
+      el.innerHTML = `<div class="empty-msg">目前尚無訂單</div>`;
+      return;
+    }
+
+    const statusMap = { paid:'badge-paid', pending:'badge-pending', cancelled:'badge-cancelled', completed:'badge-completed' };
+    const statusLbl = { paid:'已付款', pending:'待付款', cancelled:'已取消', completed:'已完成' };
+
+    el.innerHTML = hostBookings
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map(b => `
+        <div class="order-row">
+          <div class="order-row-info">
+            <div class="order-row-name">${escHtml(b.propertyName)}</div>
+            <div class="order-row-meta">
+              👤 ${escHtml(b.guestName || '旅客')}
+              ・📅 ${escHtml(b.checkIn)} — ${escHtml(b.checkOut)}（${b.nights || 1} 晚）
+              ・👥 ${b.guests || 1} 人
+              ${b.note ? `<br>📝 ${escHtml(b.note)}` : ''}
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--space-md);">
+            <span class="badge ${statusMap[b.status] || ''}">${statusLbl[b.status] || b.status}</span>
+            <div class="order-row-price">NT$ ${(b.totalPrice || 0).toLocaleString()}</div>
+          </div>
+        </div>`).join('');
+  }
+
+  /* ════════════════════════════════
+     §4 顧客訊息
+  ════════════════════════════════ */
+  const CANNED_REPLIES = [
+    { label:'歡迎光臨', text:'您好！歡迎預訂，很期待您的到來😊有任何問題都可以隨時詢問！' },
+    { label:'停車資訊', text:'停車場在大門左側，共 10 個免費車位。若已客滿，步行 200 公尺處有公共停車場。' },
+    { label:'早餐時間', text:'早餐時間為 07:30–09:30，在一樓餐廳供應，請別錯過！🍳' },
+    { label:'行李寄放', text:'當然可以！入住前及退房後均提供免費行李寄放，請於前台登記即可🧳' },
+  ];
+
+  function initConversations() {
+    let convs = getConvs();
+    // 若無對話，從訂房記錄建立假對話
+    if (convs.length === 0 && hostBookings.length > 0) {
+      hostBookings.slice(0, 3).forEach((b, i) => {
+        convs.push({
+          id:           'conv_' + b.id,
+          hostId:       currentUser.id,
+          guestId:      b.userId || 'u_guest_01',
+          guestName:    b.guestName || '旅客',
+          propertyId:   b.propertyId,
+          propertyName: b.propertyName,
+          messages: [
+            { sender:'guest', text:`您好！我是 ${b.guestName || '旅客'}，預計 ${b.checkIn} 入住，請問有什麼需要注意的嗎？`, createdAt: b.createdAt },
+          ],
+        });
+      });
+      setConvs(convs);
+    }
+    convData = getConvs().filter(c => c.hostId === currentUser.id);
+  }
+
+  function renderConvList() {
+    const el = document.getElementById('conv-list');
+    if (!convData.length) {
+      el.innerHTML = `<div style="padding:var(--space-md);font-size:13px;color:var(--color-text-light);">目前無訊息</div>`;
+      return;
+    }
+    el.innerHTML = convData.map((c, i) => {
+      const last = c.messages[c.messages.length - 1];
+      return `
+        <div class="conv-item ${i === activeConvIdx ? 'active' : ''}" onclick="selectConv(${i})">
+          <div class="conv-name">${escHtml(c.guestName)}</div>
+          <div class="conv-prop">📍 ${escHtml(c.propertyName)}</div>
+          <div class="conv-last">${escHtml(last?.text || '')}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function selectConv(idx) {
+    activeConvIdx = idx;
+    renderConvList();
+    renderChatMain();
+  }
+
+  function renderChatMain() {
+    const el = document.getElementById('chat-main');
+    if (!convData.length) {
+      el.innerHTML = `<div class="empty-msg" style="margin:auto;">選擇對話以查看訊息</div>`;
+      return;
+    }
+    const conv = convData[activeConvIdx];
+    const hostInitial = (currentUser.name || 'H').slice(0, 1);
+    const guestInitial = (conv.guestName || 'G').slice(0, 1);
+
+    const msgsHtml = conv.messages.map(m => {
+      const isMine = m.sender === 'host';
+      return `
+        <div class="chat-msg ${isMine ? 'mine' : ''}">
+          <div class="chat-avatar">${isMine ? escHtml(hostInitial) : escHtml(guestInitial)}</div>
+          <div class="chat-bubble">${escHtml(m.text)}</div>
+        </div>`;
+    }).join('');
+
+    const cannedHtml = CANNED_REPLIES.map(r =>
+      `<button class="canned-chip" onclick="sendCanned(${JSON.stringify(r.text)})">${escHtml(r.label)}</button>`
+    ).join('');
+
+    el.innerHTML = `
+      <div class="chat-head">
+        <div class="chat-head-name">👤 ${escHtml(conv.guestName)}</div>
+        <div class="chat-head-prop">📍 ${escHtml(conv.propertyName)}</div>
+      </div>
+      <div class="chat-messages" id="chat-msgs">${msgsHtml}</div>
+      <div class="chat-canned">${cannedHtml}</div>
+      <div class="chat-input-row">
+        <input class="chat-input" type="text" id="chat-input-field" placeholder="輸入回覆…" onkeydown="onChatKey(event)">
+        <button class="chat-send" onclick="sendHostMsg()" aria-label="送出">➤</button>
+      </div>`;
+
+    scrollMsgs();
+  }
+
+  function scrollMsgs() {
+    const box = document.getElementById('chat-msgs');
+    if (box) setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
+  }
+
+  function sendHostMsg() {
+    const input = document.getElementById('chat-input-field');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    pushMsg(text);
+    input.value = '';
+  }
+
+  function sendCanned(text) {
+    pushMsg(text);
+  }
+
+  function pushMsg(text) {
+    const convs = getConvs();
+    const conv  = convData[activeConvIdx];
+    const idx   = convs.findIndex(c => c.id === conv.id);
+    if (idx < 0) return;
+    const msg = { sender: 'host', text, createdAt: nowISO() };
+    convs[idx].messages.push(msg);
+    setConvs(convs);
+    convData[activeConvIdx].messages.push(msg);
+    renderChatMain();
+    renderConvList();
+  }
+
+  function onChatKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendHostMsg(); }
+  }
+
+  init();
+</script>
 </body>
 </html>

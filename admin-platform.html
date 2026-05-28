@@ -5,16 +5,758 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 管理員後台</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── 整體佈局 ── */
+    .dashboard-wrap { display: flex; min-height: calc(100vh - 60px); }
+
+    /* ── 左側選單 ── */
+    .sidebar {
+      width: 220px; flex-shrink: 0;
+      background: #1A3A2E;
+      padding: var(--space-xl) 0;
+      position: sticky; top: 60px; height: calc(100vh - 60px);
+      overflow-y: auto;
+    }
+    .sidebar-logo { padding: 0 var(--space-lg) var(--space-lg); border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: var(--space-md); }
+    .sidebar-logo-title { font-size: 15px; font-weight: 700; color: #fff; }
+    .sidebar-logo-sub   { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 2px; }
+    .sidebar-item {
+      display: flex; align-items: center; gap: var(--space-sm);
+      padding: 12px var(--space-lg); font-size: 14px; font-weight: 500;
+      color: rgba(255,255,255,.7); cursor: pointer;
+      border-left: 3px solid transparent; transition: all .15s;
+    }
+    .sidebar-item:hover  { background: rgba(255,255,255,.07); color: #fff; }
+    .sidebar-item.active { background: rgba(255,255,255,.11); color: #fff; border-left-color: var(--color-accent-red); }
+    .sidebar-icon { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
+    .sidebar-badge {
+      margin-left: auto; background: var(--color-accent-red); color: #fff;
+      font-size: 10px; font-weight: 700; padding: 2px 6px;
+      border-radius: var(--radius-xl); flex-shrink: 0;
+    }
+
+    /* ── 右側主內容 ── */
+    .main-content { flex: 1; background: #f5f3ef; min-width: 0; }
+    .main-inner   { padding: var(--space-xl); }
+    .section-page { display: none; }
+    .section-page.active { display: block; }
+
+    .page-title-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--space-xl); flex-wrap: wrap; gap: var(--space-sm);
+    }
+    .page-title { font-size: 22px; font-weight: 700; color: var(--color-text-main); }
+
+    /* ── 統計卡（首頁概覽） ── */
+    .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: var(--space-md); margin-bottom: var(--space-xl); }
+    .stat-card { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--space-lg); text-align: center; }
+    .stat-num { font-size: 32px; font-weight: 700; color: var(--color-primary); }
+    .stat-lbl { font-size: 13px; color: var(--color-text-sub); margin-top: 4px; }
+
+    /* ── 共用卡片 ── */
+    .admin-card {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); padding: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+    .card-row { display: flex; align-items: flex-start; gap: var(--space-md); }
+    .card-thumb { width: 80px; height: 68px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 34px; flex-shrink: 0; }
+    .card-body  { flex: 1; min-width: 0; }
+    .card-title { font-size: 15px; font-weight: 700; color: var(--color-text-main); margin-bottom: 4px; }
+    .card-meta  { font-size: 13px; color: var(--color-text-sub); line-height: 1.8; }
+    .card-actions { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); flex-wrap: wrap; }
+    .empty-msg  { text-align: center; padding: var(--space-2xl); color: var(--color-text-light); font-size: 14px; }
+
+    /* ── 審核退件 Modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 500; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #fff; border-radius: var(--radius-xl); width: 90%; max-width: 480px; box-shadow: var(--shadow-modal); }
+    .modal-head { padding: var(--space-lg); border-bottom: 1px solid var(--color-border-light); display: flex; align-items: center; justify-content: space-between; }
+    .modal-title { font-size: 17px; font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--color-text-sub); }
+    .modal-body  { padding: var(--space-lg); }
+    .modal-foot  { padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--color-border-light); display: flex; gap: var(--space-sm); justify-content: flex-end; }
+
+    /* ── 價格上限 ── */
+    .price-limit-card { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--space-xl); max-width: 440px; }
+    .price-limit-current { font-size: 36px; font-weight: 700; color: var(--color-primary); margin: var(--space-md) 0; }
+    .price-limit-row { display: flex; gap: var(--space-md); align-items: flex-end; }
+    .price-limit-row .form-group { flex: 1; margin: 0; }
+
+    /* ── 訂單列表 ── */
+    .conflict-row { border-left: 4px solid var(--color-accent-red) !important; }
+    .conflict-tag { background: var(--color-danger); color: var(--color-danger-text); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-sm); }
+    .filter-tabs { display: flex; gap: 4px; margin-bottom: var(--space-lg); background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: 4px; width: fit-content; }
+    .ftab { padding: 6px 16px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: none; font-family: var(--font-main); color: var(--color-text-sub); transition: all .15s; }
+    .ftab.active { background: var(--color-primary); color: #fff; }
+
+    /* ── 評價管理 ── */
+    .review-card { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-md); padding: var(--space-md); margin-bottom: var(--space-sm); }
+    .review-card.hidden-review { opacity: .5; }
+    .review-header { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: 8px; }
+    .review-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+    .review-stars  { color: var(--color-accent-yellow); }
+    .review-text   { font-size: 13px; color: var(--color-text-sub); line-height: 1.7; }
+
+    /* ── 客服管理 ── */
+    .cs-layout { display: grid; grid-template-columns: 240px 1fr; background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); overflow: hidden; height: 580px; }
+    .case-list  { border-right: 1px solid var(--color-border-light); overflow-y: auto; display: flex; flex-direction: column; }
+    .case-filter { padding: 8px; border-bottom: 1px solid var(--color-border-light); display: flex; gap: 4px; flex-wrap: wrap; }
+    .case-ftab { padding: 4px 8px; border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; border: 1px solid var(--color-border); background: #fff; font-family: var(--font-main); color: var(--color-text-sub); }
+    .case-ftab.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .case-item { padding: 10px var(--space-md); border-bottom: 1px solid #f0ede5; cursor: pointer; transition: background .15s; }
+    .case-item:hover { background: var(--color-secondary); }
+    .case-item.active { background: #e8f0ec; }
+    .case-name { font-size: 13px; font-weight: 600; color: var(--color-text-main); }
+    .case-type { font-size: 11px; color: var(--color-text-sub); margin-top: 2px; }
+    .case-status { font-size: 10px; font-weight: 700; }
+    .case-status.pending { color: var(--color-warning-text); }
+    .case-status.active  { color: var(--color-primary); }
+    .case-status.closed  { color: var(--color-text-light); }
+
+    .cs-main  { display: flex; flex-direction: column; }
+    .cs-head  { padding: 12px var(--space-md); background: var(--color-secondary); border-bottom: 1px solid var(--color-border-light); }
+    .cs-head-title { font-size: 14px; font-weight: 700; color: var(--color-text-main); }
+    .cs-head-meta  { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
+    .cs-msgs  { flex: 1; overflow-y: auto; padding: var(--space-md); }
+    .cs-msg   { display: flex; gap: 8px; margin-bottom: var(--space-sm); }
+    .cs-msg.admin { flex-direction: row-reverse; }
+    .cs-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+    .cs-bubble { max-width: 240px; padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+    .cs-msg:not(.admin) .cs-avatar { background: #e0e8e4; color: var(--color-primary); }
+    .cs-msg:not(.admin) .cs-bubble { background: #f5f3ec; color: var(--color-text-main); border-bottom-left-radius: 4px; }
+    .cs-msg.admin .cs-avatar { background: #1A3A2E; color: #fff; }
+    .cs-msg.admin .cs-bubble  { background: #1A3A2E; color: #fff; border-bottom-right-radius: 4px; }
+    .cs-quick { padding: 6px var(--space-md); border-top: 1px solid #f0ede5; display: flex; gap: 4px; flex-wrap: wrap; }
+    .quick-chip { padding: 3px 9px; border: 1.5px solid var(--color-border); border-radius: var(--radius-xl); font-size: 11px; cursor: pointer; background: #fff; font-family: var(--font-main); color: var(--color-text-sub); transition: all .15s; }
+    .quick-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .cs-input-row { padding: 10px var(--space-md); border-top: 1px solid var(--color-border-light); display: flex; gap: var(--space-sm); }
+    .cs-input { flex: 1; border: 1.5px solid var(--color-border); border-radius: var(--radius-xl); padding: 7px 14px; font-size: 13px; font-family: var(--font-main); outline: none; transition: border-color .15s; }
+    .cs-input:focus { border-color: var(--color-primary); }
+    .cs-send { background: #1A3A2E; color: #fff; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .cs-close-btn { background: var(--color-accent-red); color: #fff; border: none; padding: 6px 14px; border-radius: var(--radius-md); font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font-main); white-space: nowrap; }
+
+    /* 狀態 badges */
+    .badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-xl); }
+    .badge-pending  { background: var(--color-warning);  color: var(--color-warning-text); }
+    .badge-online   { background: var(--color-success);  color: var(--color-success-text); }
+    .badge-paid     { background: var(--color-success);  color: var(--color-success-text); }
+    .badge-cancelled{ background: var(--color-danger);   color: var(--color-danger-text); }
+    .badge-completed{ background: #E3F2FD; color: #1565C0; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #1A3A2E; color: #fff; padding: 10px 24px; border-radius: var(--radius-xl); font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9999; }
+    .toast.show { opacity: 1; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<div id="app">
+  <div class="dashboard-wrap">
+
+    <!-- ── 左側選單 ── -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-title">⚙️ 管理員後台</div>
+        <div class="sidebar-logo-sub" id="admin-name"></div>
+      </div>
+      <nav>
+        <div class="sidebar-item active" data-sec="review"  onclick="showSec('review')">
+          <span class="sidebar-icon">🏠</span>房源審核
+          <span class="sidebar-badge" id="badge-review">0</span>
+        </div>
+        <div class="sidebar-item" data-sec="price"   onclick="showSec('price')">
+          <span class="sidebar-icon">💰</span>價格上限
+        </div>
+        <div class="sidebar-item" data-sec="orders"  onclick="showSec('orders')">
+          <span class="sidebar-icon">📋</span>全平台訂單
+        </div>
+        <div class="sidebar-item" data-sec="reviews" onclick="showSec('reviews')">
+          <span class="sidebar-icon">⭐</span>評價管理
+        </div>
+        <div class="sidebar-item" data-sec="cs"      onclick="showSec('cs')">
+          <span class="sidebar-icon">🎧</span>客服管理
+          <span class="sidebar-badge" id="badge-cs">0</span>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- ── 右側主內容 ── */
+    <div class="main-content">
+      <div class="main-inner">
+
+        <!-- §1 房源審核 -->
+        <div class="section-page active" id="sec-review">
+          <div class="page-title-row">
+            <div class="page-title">房源審核</div>
+          </div>
+          <div id="review-list"><!-- 動態填入 --></div>
+        </div>
+
+        <!-- §2 價格上限 -->
+        <div class="section-page" id="sec-price">
+          <div class="page-title-row">
+            <div class="page-title">價格上限管理</div>
+          </div>
+          <div class="price-limit-card">
+            <div style="font-size:14px;color:var(--color-text-sub);">目前全平台最高售價上限</div>
+            <div class="price-limit-current" id="current-limit">NT$ 0</div>
+            <div style="font-size:13px;color:var(--color-text-sub);margin-bottom:var(--space-md);">超過此上限的房源將無法上架。設定後立即生效。</div>
+            <div class="price-limit-row">
+              <div class="form-group">
+                <label class="form-label">新上限（NT$）</label>
+                <input class="form-input" type="number" id="new-limit" min="0" step="100" placeholder="例：10000">
+              </div>
+              <button class="btn btn-primary" onclick="savePriceLimit()">儲存</button>
+            </div>
+            <div style="margin-top:var(--space-xl);">
+              <div style="font-size:13px;font-weight:600;margin-bottom:var(--space-sm);">常用上限快速設定</div>
+              <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
+                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(5000)">NT$ 5,000</button>
+                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(8000)">NT$ 8,000</button>
+                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(10000)">NT$ 10,000</button>
+                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(15000)">NT$ 15,000</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- §3 全平台訂單 -->
+        <div class="section-page" id="sec-orders">
+          <div class="page-title-row">
+            <div class="page-title">全平台訂單</div>
+            <span style="font-size:13px;color:var(--color-text-sub);" id="orders-count"></span>
+          </div>
+          <div class="filter-tabs" id="orders-filter-tabs">
+            <button class="ftab active" data-f="all"       onclick="setOrderFilter('all')">全部</button>
+            <button class="ftab"        data-f="paid"      onclick="setOrderFilter('paid')">已付款</button>
+            <button class="ftab"        data-f="pending"   onclick="setOrderFilter('pending')">待付款</button>
+            <button class="ftab"        data-f="completed" onclick="setOrderFilter('completed')">已完成</button>
+            <button class="ftab"        data-f="cancelled" onclick="setOrderFilter('cancelled')">已取消</button>
+          </div>
+          <div id="all-orders-list"><!-- 動態填入 --></div>
+        </div>
+
+        <!-- §4 評價管理 -->
+        <div class="section-page" id="sec-reviews">
+          <div class="page-title-row">
+            <div class="page-title">評價管理</div>
+          </div>
+          <div id="all-reviews-list"><!-- 動態填入 --></div>
+        </div>
+
+        <!-- §5 客服管理 -->
+        <div class="section-page" id="sec-cs">
+          <div class="page-title-row">
+            <div class="page-title">客服管理</div>
+          </div>
+          <div class="cs-layout">
+            <!-- 左側案件列表 -->
+            <div class="case-list">
+              <div class="case-filter">
+                <button class="case-ftab active" data-cf="all"     onclick="setCsFilter('all')">全部</button>
+                <button class="case-ftab"        data-cf="pending" onclick="setCsFilter('pending')">待處理</button>
+                <button class="case-ftab"        data-cf="active"  onclick="setCsFilter('active')">進行中</button>
+                <button class="case-ftab"        data-cf="closed"  onclick="setCsFilter('closed')">已結案</button>
+              </div>
+              <div id="case-list-body"><!-- 動態填入 --></div>
+            </div>
+            <!-- 右側對話 -->
+            <div class="cs-main" id="cs-main"><!-- 動態填入 --></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 退件 Modal -->
+<div class="modal-overlay" id="reject-modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">退件原因</div>
+      <button class="modal-close" onclick="closeRejectModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="reject-prop-info" style="margin-bottom:var(--space-md);font-size:14px;color:var(--color-text-sub);"></div>
+      <label class="form-label">請填寫退件原因（將通知房東）</label>
+      <textarea class="form-input" id="reject-reason" rows="4" placeholder="例：照片不清晰、資訊填寫不完整、價格設定有誤…"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeRejectModal()">取消</button>
+      <button class="btn btn-danger" onclick="confirmReject()">確認退件</button>
+    </div>
+  </div>
+</div>
+
+<!-- 滿意度調查通知 Modal -->
+<div class="modal-overlay" id="survey-modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">✅ 案件已結案</div>
+      <button class="modal-close" onclick="closeSurveyModal()">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:var(--space-2xl);">
+      <div style="font-size:48px;margin-bottom:var(--space-md);">📨</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:var(--space-sm);">滿意度調查已發送</div>
+      <div style="font-size:13px;color:var(--color-text-sub);">系統已自動向旅客發送滿意度調查問卷，<br>回覆結果將顯示於客服管理報表。</div>
+    </div>
+    <div class="modal-foot" style="justify-content:center;">
+      <button class="btn btn-primary" onclick="closeSurveyModal()">確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div id="footer-container"></div>
+
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+  renderNav();
+  renderFooter();
+
+  /* ── 頁面保護 ── */
+  const currentUser = getCurrentUser();
+  if (!currentUser || currentUser.role !== 'admin') {
+    window.location.href = 'login.html';
+  }
+
+  /* ── 工具 ── */
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function showToast(msg, ms = 2400) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), ms);
+  }
+
+  /* ── 評價存取 ── */
+  const REVIEWS_KEY  = 'agenttt_reviews';
+  function getAllReviews() { try { return JSON.parse(localStorage.getItem(REVIEWS_KEY) || '[]'); } catch { return []; } }
+  function setAllReviews(r) { localStorage.setItem(REVIEWS_KEY, JSON.stringify(r)); }
+
+  /* ── 房源展示 ── */
+  const PROP_THUMB = {
+    prop_01: { emoji:'🏡', bg:'#C8E6C9' },
+    prop_02: { emoji:'🌲', bg:'#D7CCC8' },
+    prop_03: { emoji:'🚂', bg:'#FFCDD2' },
+  };
+  function thumb(id) { return PROP_THUMB[id] || { emoji:'🏠', bg:'#f0ede5' }; }
+
+  /* ── 狀態 ── */
+  let rejectPropId  = '';
+  let orderFilter   = 'all';
+  let csFilter      = 'all';
+  let activeCaseIdx = 0;
+  let allComplaints = [];
+
+  /* ════════════════════════════════
+     初始化
+  ════════════════════════════════ */
+  function init() {
+    document.getElementById('admin-name').textContent = currentUser.name;
+    allComplaints = getComplaints();
+
+    updateBadges();
+    renderPendingProps();
+    renderPriceLimit();
+    renderAllOrders();
+    renderAllReviews();
+    renderCsList();
+    renderCsMain();
+  }
+
+  function updateBadges() {
+    const pending = getProperties().filter(p => p.status === 'pending').length;
+    const openCs  = allComplaints.filter(c => c.status !== 'closed').length;
+    const bRev = document.getElementById('badge-review');
+    const bCs  = document.getElementById('badge-cs');
+    if (bRev) bRev.textContent = pending || '';
+    if (bCs)  bCs.textContent  = openCs  || '';
+  }
+
+  /* ── 切換 section ── */
+  function showSec(name) {
+    document.querySelectorAll('.section-page').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('sec-' + name).classList.add('active');
+    document.querySelector(`[data-sec="${name}"]`).classList.add('active');
+  }
+
+  /* ════════════════════════════════
+     §1 房源審核
+  ════════════════════════════════ */
+  function renderPendingProps() {
+    const pending = getProperties().filter(p => p.status === 'pending');
+    const el = document.getElementById('review-list');
+
+    if (!pending.length) {
+      el.innerHTML = `<div class="empty-msg">🎉 目前沒有待審核的房源</div>`;
+      return;
+    }
+
+    el.innerHTML = pending.map(p => {
+      const th = thumb(p.id);
+      return `
+        <div class="admin-card">
+          <div class="card-row">
+            <div class="card-thumb" style="background:${th.bg};">${th.emoji}</div>
+            <div class="card-body">
+              <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:4px;">
+                <div class="card-title">${escHtml(p.name)}</div>
+                <span class="badge badge-pending">待審核</span>
+              </div>
+              <div class="card-meta">
+                📍 ${escHtml(p.station)}・🏠 ${escHtml(p.roomType)}・👥 最多 ${p.maxGuests} 人<br>
+                平日 NT$ ${(p.priceWeekday||0).toLocaleString()}・假日 NT$ ${(p.priceWeekend||0).toLocaleString()}<br>
+                ${p.description ? escHtml(p.description.slice(0, 60)) + '…' : ''}
+              </div>
+              <div class="card-actions">
+                <button class="btn btn-primary btn-sm" onclick="approveProp('${escHtml(p.id)}')">✅ 審核通過</button>
+                <button class="btn btn-danger btn-sm"  onclick="openRejectModal('${escHtml(p.id)}','${escHtml(p.name)}')">❌ 退件</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function approveProp(propId) {
+    const props = getProperties();
+    const idx   = props.findIndex(p => p.id === propId);
+    if (idx >= 0) { props[idx].status = 'online'; setData('agenttt_properties', props); }
+    updateBadges();
+    renderPendingProps();
+    showToast('✅ 房源已審核通過，即刻上線');
+  }
+
+  function openRejectModal(propId, propName) {
+    rejectPropId = propId;
+    document.getElementById('reject-prop-info').textContent = `房源：${propName}`;
+    document.getElementById('reject-reason').value = '';
+    document.getElementById('reject-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeRejectModal() {
+    document.getElementById('reject-modal').classList.remove('open');
+    document.body.style.overflow = '';
+    rejectPropId = '';
+  }
+  function confirmReject() {
+    if (!rejectPropId) return;
+    const reason = document.getElementById('reject-reason').value.trim();
+    const props  = getProperties();
+    const idx    = props.findIndex(p => p.id === rejectPropId);
+    if (idx >= 0) {
+      props[idx].status      = 'offline';
+      props[idx].rejectReason = reason;
+      setData('agenttt_properties', props);
+    }
+    closeRejectModal();
+    updateBadges();
+    renderPendingProps();
+    showToast('房源已退件，通知已發送至房東');
+  }
+
+  /* ════════════════════════════════
+     §2 價格上限
+  ════════════════════════════════ */
+  function renderPriceLimit() {
+    const s = getSettings();
+    const lim = s.maxPriceLimit || 10000;
+    document.getElementById('current-limit').textContent = `NT$ ${lim.toLocaleString()}`;
+    document.getElementById('new-limit').value = lim;
+  }
+  function savePriceLimit() {
+    const val = Number(document.getElementById('new-limit').value);
+    if (!val || val < 0) { showToast('⚠️ 請輸入有效金額'); return; }
+    const s = getSettings();
+    s.maxPriceLimit = val;
+    saveSettings(s);
+    renderPriceLimit();
+    showToast(`✅ 價格上限已更新為 NT$ ${val.toLocaleString()}`);
+  }
+  function setQuickLimit(val) {
+    document.getElementById('new-limit').value = val;
+    savePriceLimit();
+  }
+
+  /* ════════════════════════════════
+     §3 全平台訂單
+  ════════════════════════════════ */
+  function detectConflicts(bookings) {
+    const conflicts = new Set();
+    const byProp    = {};
+    bookings.forEach(b => {
+      if (!byProp[b.propertyId]) byProp[b.propertyId] = [];
+      byProp[b.propertyId].push(b);
+    });
+    Object.values(byProp).forEach(list => {
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const a = list[i], b = list[j];
+          if (a.status === 'cancelled' || b.status === 'cancelled') continue;
+          if (a.checkIn < b.checkOut && b.checkIn < a.checkOut) {
+            conflicts.add(a.id); conflicts.add(b.id);
+          }
+        }
+      }
+    });
+    return conflicts;
+  }
+
+  function setOrderFilter(f) {
+    orderFilter = f;
+    document.querySelectorAll('#orders-filter-tabs .ftab').forEach(el =>
+      el.classList.toggle('active', el.dataset.f === f));
+    renderAllOrders();
+  }
+
+  function renderAllOrders() {
+    const all      = getBookings().sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt));
+    const filtered = orderFilter === 'all' ? all : all.filter(b => b.status === orderFilter);
+    const conflicts = detectConflicts(all);
+    const el        = document.getElementById('all-orders-list');
+
+    document.getElementById('orders-count').textContent =
+      `共 ${all.length} 筆訂單${conflicts.size ? `・⚠️ ${conflicts.size/2|0} 組時間衝突` : ''}`;
+
+    if (!filtered.length) {
+      el.innerHTML = `<div class="empty-msg">沒有符合條件的訂單</div>`;
+      return;
+    }
+
+    const stMap = { paid:'badge-paid', pending:'badge-pending', cancelled:'badge-cancelled', completed:'badge-completed' };
+    const stLbl = { paid:'已付款', pending:'待付款', cancelled:'已取消', completed:'已完成' };
+
+    el.innerHTML = filtered.map(b => {
+      const isConflict = conflicts.has(b.id);
+      return `
+        <div class="admin-card" style="margin-bottom:8px;${isConflict ? 'border-left:4px solid var(--color-accent-red);' : ''}">
+          <div style="display:flex;align-items:flex-start;gap:var(--space-md);flex-wrap:wrap;">
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:4px;flex-wrap:wrap;">
+                <span style="font-size:14px;font-weight:700;">${escHtml(b.propertyName)}</span>
+                <span class="badge ${stMap[b.status]||''}">${stLbl[b.status]||b.status}</span>
+                ${isConflict ? `<span class="conflict-tag">⚠️ 時間衝突</span>` : ''}
+              </div>
+              <div style="font-size:13px;color:var(--color-text-sub);">
+                👤 ${escHtml(b.guestName||'旅客')}
+                ・📅 ${escHtml(b.checkIn)} — ${escHtml(b.checkOut)}（${b.nights||1} 晚）
+                ・👥 ${b.guests||1} 人
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:18px;font-weight:700;color:var(--color-primary);">NT$ ${(b.totalPrice||0).toLocaleString()}</div>
+              <div style="font-size:11px;color:var(--color-text-light);margin-top:2px;">ID: ${escHtml(b.id)}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ════════════════════════════════
+     §4 評價管理
+  ════════════════════════════════ */
+  function renderAllReviews() {
+    const reviews = getAllReviews();
+    const el      = document.getElementById('all-reviews-list');
+
+    if (!reviews.length) {
+      el.innerHTML = `<div class="empty-msg">目前尚無評價</div>`;
+      return;
+    }
+
+    el.innerHTML = reviews.map((r, i) => {
+      const initial = (r.userName || '旅').slice(0, 1);
+      const stars   = '★'.repeat(r.rating || 0) + '☆'.repeat(5 - (r.rating || 0));
+      const prop    = getPropertyById(r.propertyId);
+      return `
+        <div class="review-card ${r.hidden ? 'hidden-review' : ''}" id="rev-${i}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+            <div class="review-header" style="margin:0;">
+              <div class="review-avatar">${escHtml(initial)}</div>
+              <div>
+                <div style="font-size:14px;font-weight:600;">${escHtml(r.userName||'匿名')}</div>
+                <div style="font-size:12px;color:var(--color-text-sub);">${escHtml(prop?.name||r.propertyId||'')}</div>
+              </div>
+              <div class="review-stars" style="margin-left:8px;">${stars}</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              ${r.hidden
+                ? `<span style="font-size:12px;color:var(--color-text-light);">已隱藏</span><button class="btn btn-outline btn-sm" onclick="toggleReview(${i})">恢復</button>`
+                : `<button class="btn btn-ghost btn-sm" onclick="toggleReview(${i})">隱藏</button>`}
+            </div>
+          </div>
+          <div class="review-text">${escHtml(r.text||'')}</div>
+          <div style="font-size:11px;color:var(--color-text-light);margin-top:6px;">${escHtml(r.createdAt?.slice(0,10)||'')}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function toggleReview(idx) {
+    const reviews = getAllReviews();
+    if (!reviews[idx]) return;
+    reviews[idx].hidden = !reviews[idx].hidden;
+    setAllReviews(reviews);
+    renderAllReviews();
+    showToast(reviews[idx].hidden ? '評價已隱藏' : '評價已恢復顯示');
+  }
+
+  /* ════════════════════════════════
+     §5 客服管理
+  ════════════════════════════════ */
+  function setCsFilter(f) {
+    csFilter = f;
+    activeCaseIdx = 0;
+    document.querySelectorAll('.case-ftab').forEach(el =>
+      el.classList.toggle('active', el.dataset.cf === f));
+    renderCsList();
+    renderCsMain();
+  }
+
+  function filteredComplaints() {
+    return csFilter === 'all'
+      ? allComplaints
+      : allComplaints.filter(c => c.status === csFilter);
+  }
+
+  function renderCsList() {
+    const list = filteredComplaints();
+    const el   = document.getElementById('case-list-body');
+    if (!list.length) {
+      el.innerHTML = `<div style="padding:var(--space-md);font-size:13px;color:var(--color-text-light);">無案件</div>`;
+      return;
+    }
+    const stLbl   = { pending:'待處理', active:'進行中', closed:'已結案' };
+    const stClass  = { pending:'pending', active:'active', closed:'closed' };
+    el.innerHTML = list.map((c, i) => `
+      <div class="case-item ${i === activeCaseIdx ? 'active' : ''}" onclick="selectCase(${i})">
+        <div class="case-name">${escHtml(c.userName||'旅客')}</div>
+        <div class="case-type">${escHtml(c.type||'')}${c.orderId ? `・${escHtml(c.orderId)}` : ''}</div>
+        <div class="case-status ${stClass[c.status]||''}">${stLbl[c.status]||c.status}</div>
+      </div>`).join('');
+  }
+
+  function selectCase(idx) {
+    activeCaseIdx = idx;
+    renderCsList();
+    renderCsMain();
+  }
+
+  const QUICK_REPLIES = [
+    { label:'收到',   text:'您好！已收到您的客訴，我們正在調查中，請稍候。' },
+    { label:'延誤補償', text:'針對列車延誤，您可申請延誤補償，請至台鐵客服頁面提交申請，我們將協助處理。' },
+    { label:'退票說明', text:'退票需在發車前辦理，手續費依規定收取。如需協助請提供訂單編號。' },
+    { label:'感謝回饋', text:'感謝您的回饋，我們會持續改善服務品質。如有其他問題請隨時聯繫！' },
+  ];
+
+  function renderCsMain() {
+    const el   = document.getElementById('cs-main');
+    const list = filteredComplaints();
+    if (!list.length) {
+      el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--color-text-light);font-size:14px;">選擇案件查看詳情</div>`;
+      return;
+    }
+    const c = list[activeCaseIdx];
+    if (!c) { el.innerHTML = ''; return; }
+
+    const isClosed = c.status === 'closed';
+    const adminInit = (currentUser.name || 'A').slice(0, 1);
+    const guestInit = (c.userName || 'G').slice(0, 1);
+
+    const msgsHtml = (c.messages || []).map(m => {
+      const isAdmin = m.userId === currentUser.id || m.userId === 'u_admin_01';
+      return `
+        <div class="cs-msg ${isAdmin ? 'admin' : ''}">
+          <div class="cs-avatar">${isAdmin ? escHtml(adminInit) : escHtml(guestInit)}</div>
+          <div class="cs-bubble">${escHtml(m.content||m.text||'')}</div>
+        </div>`;
+    }).join('');
+
+    const quickHtml = QUICK_REPLIES.map(r =>
+      `<button class="quick-chip" onclick="sendCsReply(${JSON.stringify(r.text)})">${escHtml(r.label)}</button>`
+    ).join('');
+
+    el.innerHTML = `
+      <div class="cs-head">
+        <div class="cs-head-title">${escHtml(c.title||'客訴案件')}</div>
+        <div class="cs-head-meta">
+          👤 ${escHtml(c.userName)}・類型：${escHtml(c.type||'')}
+          ${c.orderId ? `・訂單：${escHtml(c.orderId)}` : ''}
+          ${c.closedAt ? `・結案時間：${escHtml(c.closedAt.slice(0,10))}` : ''}
+        </div>
+        ${c.description ? `<div style="font-size:12px;color:var(--color-text-sub);margin-top:4px;">📄 ${escHtml(c.description)}</div>` : ''}
+      </div>
+      <div class="cs-msgs" id="cs-msgs-box">${msgsHtml}</div>
+      ${isClosed ? `<div style="padding:var(--space-md);text-align:center;font-size:13px;color:var(--color-text-light);">✅ 此案件已結案</div>` : `
+        <div class="cs-quick">${quickHtml}</div>
+        <div class="cs-input-row">
+          <input class="cs-input" type="text" id="cs-input-field" placeholder="輸入回覆…" onkeydown="onCsKey(event)">
+          <button class="cs-close-btn" onclick="closeCase()">送出並結案</button>
+          <button class="cs-send" onclick="sendCsMsg()" aria-label="送出">➤</button>
+        </div>`}`;
+
+    setTimeout(() => {
+      const box = document.getElementById('cs-msgs-box');
+      if (box) box.scrollTop = box.scrollHeight;
+    }, 50);
+  }
+
+  function sendCsReply(text) {
+    pushCsMsg(text, false);
+  }
+  function sendCsMsg() {
+    const inp = document.getElementById('cs-input-field');
+    if (!inp) return;
+    const text = inp.value.trim();
+    if (!text) return;
+    pushCsMsg(text, false);
+    inp.value = '';
+  }
+  function pushCsMsg(text, closeAfter) {
+    const list = filteredComplaints();
+    const c    = list[activeCaseIdx];
+    if (!c) return;
+
+    const msg = { id: generateId(), userId: currentUser.id, userName: currentUser.name, content: text, createdAt: nowISO() };
+    const allIdx = allComplaints.findIndex(ac => ac.id === c.id);
+    if (allIdx >= 0) {
+      allComplaints[allIdx].messages = allComplaints[allIdx].messages || [];
+      allComplaints[allIdx].messages.push(msg);
+      if (allComplaints[allIdx].status === 'pending') allComplaints[allIdx].status = 'active';
+      if (closeAfter) {
+        allComplaints[allIdx].status   = 'closed';
+        allComplaints[allIdx].closedAt = nowISO();
+      }
+      setData('agenttt_complaints', allComplaints);
+    }
+    renderCsList();
+    renderCsMain();
+    updateBadges();
+  }
+  function closeCase() {
+    const inp  = document.getElementById('cs-input-field');
+    const text = (inp?.value || '').trim() || '您的問題已處理完畢，感謝您聯繫 Agent TT 客服。如有其他疑問歡迎再次諮詢！';
+    pushCsMsg(text, true);
+    document.getElementById('survey-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSurveyModal() {
+    document.getElementById('survey-modal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  function onCsKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCsMsg(); }
+  }
+
+  init();
+</script>
 </body>
 </html>
