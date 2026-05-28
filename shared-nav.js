@@ -97,20 +97,52 @@ function renderNav() {
   const container = document.getElementById('navbar-container');
   if (!container) return;
 
-  const active = _getActiveModule();
-  const user   = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  const path = window.location.pathname;
 
+  /* ── 角色頁面保護 ── */
+  if (user) {
+    if (user.role === 'host' && (path.includes('trip') || path.includes('train'))) {
+      window.location.href = 'host-dashboard.html';
+      return;
+    }
+    if (user.role === 'admin' && !path.includes('admin') && !path.includes('login')) {
+      window.location.href = 'admin-platform.html';
+      return;
+    }
+  }
+
+  const active = _getActiveModule();
   const link = (href, label, key) => {
     const isActive = active === key;
     return `<a href="${href}" class="navbar-link${isActive ? ' active' : ''}">${label}</a>`;
   };
+
+  /* ── 依角色決定 Logo 目標與中間連結 ── */
+  let logoHref, middleLinks;
+
+  if (user?.role === 'host') {
+    logoHref = 'host-dashboard.html';
+    middleLinks = `<a href="host-dashboard.html" class="navbar-link${path.includes('host') ? ' active' : ''}">🏡 房東後台</a>`;
+  } else if (user?.role === 'admin') {
+    logoHref = 'admin-platform.html';
+    middleLinks = `<a href="admin-platform.html" class="navbar-link${path.includes('admin') ? ' active' : ''}">⚙️ 管理員後台</a>`;
+  } else {
+    logoHref = 'index.html';
+    middleLinks = [
+      link('index.html',           '首頁',     'home'),
+      link('trip-list.html',       '行程規劃', 'trip'),
+      link('property-search.html', '住宿訂房', 'property'),
+      link('train-search.html',    '台鐵車票', 'train'),
+    ].join('');
+  }
 
   container.innerHTML = `
     <nav id="navbar" role="navigation" aria-label="主導覽列">
       <div class="navbar-inner">
 
         <!-- 左側 Logo -->
-        <a href="index.html" class="navbar-brand" aria-label="Agent TT 首頁">
+        <a href="${logoHref}" class="navbar-brand" aria-label="Agent TT 首頁">
           ${_logoSVG()}
           <div>
             <div class="navbar-brand-name">Agent TT</div>
@@ -120,10 +152,7 @@ function renderNav() {
 
         <!-- 中間連結 -->
         <div class="navbar-links" role="list">
-          ${link('index.html',           '首頁',     'home')}
-          ${link('trip-list.html',       '行程規劃', 'trip')}
-          ${link('property-search.html', '住宿訂房', 'property')}
-          ${link('train-search.html',    '台鐵車票', 'train')}
+          ${middleLinks}
         </div>
 
         <!-- 右側使用者 -->
