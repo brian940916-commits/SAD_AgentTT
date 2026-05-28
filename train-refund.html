@@ -5,16 +5,657 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 退改票</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    body { background: var(--color-bg); }
+
+    /* ── Page Header ── */
+    .page-header { padding: var(--space-xl) 0 var(--space-md); border-bottom: 1px solid var(--color-border-light); margin-bottom: 0; }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--color-text-main); }
+
+    /* ── Tab ── */
+    .main-tabs { display: flex; border-bottom: 2px solid var(--color-border-light); margin-bottom: 28px; }
+    .main-tab {
+      padding: 12px 24px; font-size: 14px; font-weight: 600;
+      color: var(--color-text-light); border: none; background: none;
+      font-family: var(--font-main); cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -2px;
+      transition: color .15s, border-color .15s;
+    }
+    .main-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+    .main-tab:hover:not(.active) { color: var(--color-text-sub); }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── 票券選擇器 ── */
+    .ticket-selector {
+      background: #fff;
+      border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .ticket-selector-title { font-size: 13px; font-weight: 600; color: var(--color-text-sub); letter-spacing: 1px; margin-bottom: 12px; }
+    .ticket-option-list { display: flex; flex-direction: column; gap: 8px; }
+    .ticket-option {
+      border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 20px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      transition: border-color .15s, background .15s;
+    }
+    .ticket-option:hover { border-color: var(--color-primary); }
+    .ticket-option.selected { border-color: var(--color-primary); background: #E8F4ED; }
+    .ticket-option input[type="radio"] { accent-color: var(--color-primary); width: 16px; height: 16px; cursor: pointer; }
+    .ticket-option-info { font-size: 13px; }
+    .ticket-option-route { font-weight: 700; color: var(--color-text-main); }
+    .ticket-option-meta  { color: var(--color-text-sub); font-size: 12px; margin-top: 2px; }
+    .ticket-option-price { font-weight: 700; color: var(--color-accent-red); font-size: 15px; white-space: nowrap; }
+
+    /* ── 試算結果 ── */
+    .calc-card {
+      background: #fff;
+      border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .calc-title { font-size: 15px; font-weight: 700; color: var(--color-text-main); margin-bottom: 16px; }
+    .calc-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--color-text-sub); margin-bottom: 10px; }
+    .calc-row.highlight { font-weight: 700; font-size: 16px; color: var(--color-text-main); padding-top: 10px; border-top: 1px solid var(--color-border-light); }
+    .calc-row.refund-amt { color: var(--color-primary); }
+    .calc-row.fee-amt    { color: var(--color-accent-red); }
+    .days-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .days-safe   { background: var(--color-success); color: var(--color-success-text); }
+    .days-warn   { background: var(--color-warning); color: var(--color-warning-text); }
+    .days-danger { background: var(--color-danger);  color: var(--color-danger-text); }
+
+    .confirm-btn {
+      width: 100%; padding: 13px;
+      background: var(--color-accent-red); color: #fff;
+      border: none; border-radius: var(--radius-md);
+      font-size: 15px; font-weight: 600; font-family: var(--font-main);
+      cursor: pointer; letter-spacing: 1px; transition: background .15s;
+    }
+    .confirm-btn:hover { background: #B04540; }
+    .confirm-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* 成功狀態 */
+    .success-banner {
+      background: var(--color-success);
+      border: 1px solid #B8DDCA;
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      display: flex; align-items: flex-start; gap: 12px;
+      margin-bottom: 16px;
+    }
+    .success-banner-icon { font-size: 24px; }
+    .success-banner-text { font-size: 14px; color: var(--color-success-text); line-height: 1.7; }
+
+    /* ── 改票 ── */
+    .new-train-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .new-train-option {
+      border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      text-align: center;
+    }
+    .new-train-option:hover { border-color: var(--color-primary); }
+    .new-train-option.selected { border-color: var(--color-primary); background: #E8F4ED; }
+    .new-train-time { font-size: 16px; font-weight: 700; color: var(--color-text-main); }
+    .new-train-no   { font-size: 11px; color: var(--color-text-light); }
+    .new-train-type { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
+    .diff-positive { color: var(--color-accent-red); }
+    .diff-zero     { color: var(--color-success-text); }
+    .diff-negative { color: var(--color-primary); }
+
+    /* 限制說明 */
+    .restriction-list {
+      background: #FFF8E6;
+      border: 1px solid #E8C547;
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+    }
+    .restriction-list li {
+      font-size: 13px;
+      color: #7A5A1A;
+      line-height: 2;
+      margin-left: 16px;
+    }
+
+    /* ── 規則頁 ── */
+    .rule-section { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 16px; }
+    .rule-section h3 { font-size: 16px; font-weight: 700; color: var(--color-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .rule-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .rule-table th { background: var(--color-primary); color: #FAF6EC; padding: 10px 14px; text-align: left; font-weight: 600; }
+    .rule-table td { padding: 10px 14px; border-bottom: 1px solid var(--color-border-light); color: var(--color-text-sub); }
+    .rule-table tr:last-child td { border-bottom: none; }
+    .rule-table tr:nth-child(even) td { background: #F9F7F2; }
+    .rule-table td:first-child { color: var(--color-text-main); font-weight: 500; }
+    .rule-note { font-size: 12px; color: var(--color-text-light); margin-top: 10px; line-height: 1.8; }
+
+    /* ── 空狀態 ── */
+    .empty-box { text-align: center; padding: 40px 20px; color: var(--color-text-light); }
+    .empty-box .icon { font-size: 40px; margin-bottom: 12px; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<main>
+  <div class="page-container">
+    <div class="page-header">
+      <h1>↩️ 退改票申請</h1>
+    </div>
+
+    <div style="padding-top: 20px; padding-bottom: 60px;">
+      <!-- ── 主 Tab ── -->
+      <div class="main-tabs" role="tablist">
+        <button class="main-tab active" onclick="showTab('refund', this)" role="tab">申請退票</button>
+        <button class="main-tab" onclick="showTab('change', this)" role="tab">申請改票</button>
+        <button class="main-tab" onclick="showTab('rules', this)" role="tab">退改票規則</button>
+      </div>
+
+      <!-- ═══ 退票 Tab ═══ -->
+      <div class="tab-pane active" id="tab-refund">
+        <div style="max-width:680px;">
+
+          <div class="ticket-selector">
+            <div class="ticket-selector-title">選擇要退票的票券</div>
+            <div class="ticket-option-list" id="refund-ticket-list">
+              <div class="empty-box"><div class="icon">🎫</div><div>載入中…</div></div>
+            </div>
+          </div>
+
+          <div id="refund-calc" style="display:none;">
+            <div class="calc-card">
+              <div class="calc-title">退款試算</div>
+              <div class="calc-row">
+                <span>票券原價</span>
+                <span id="calc-original-price">—</span>
+              </div>
+              <div class="calc-row">
+                <span>距發車天數</span>
+                <span id="calc-days">—</span>
+              </div>
+              <div class="calc-row fee-amt">
+                <span>退票手續費</span>
+                <span id="calc-fee">—</span>
+              </div>
+              <div class="calc-row highlight refund-amt">
+                <span>預計退款</span>
+                <span id="calc-refund">—</span>
+              </div>
+            </div>
+            <div id="refund-warning" style="margin-bottom:12px;"></div>
+            <button class="confirm-btn" id="refund-confirm-btn" onclick="submitRefund()">確認退票</button>
+          </div>
+
+          <div id="refund-success" style="display:none;">
+            <div class="success-banner">
+              <div class="success-banner-icon">✅</div>
+              <div class="success-banner-text">
+                <strong>退票申請已送出！</strong><br>
+                退款將於 3–5 個工作天退回原付款方式。<br>
+                退票編號：<strong id="refund-order-id">—</strong>
+              </div>
+            </div>
+            <button onclick="location.href='train-tickets.html'" style="padding:10px 24px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;">回到票券列表</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═══ 改票 Tab ═══ -->
+      <div class="tab-pane" id="tab-change">
+        <div style="max-width:760px;">
+
+          <div class="restriction-list">
+            <strong style="font-size:13px;color:#7A5A1A;">改票限制說明</strong>
+            <ul>
+              <li>每張票券限改票一次</li>
+              <li>須於發車前 1 小時以上申請</li>
+              <li>僅限超商取票前（QR Code 不限）</li>
+              <li>補差額升等、差額退款均依票面計算</li>
+            </ul>
+          </div>
+
+          <div class="ticket-selector">
+            <div class="ticket-selector-title">選擇要改票的票券</div>
+            <div class="ticket-option-list" id="change-ticket-list">
+              <div class="empty-box"><div class="icon">🎫</div><div>載入中…</div></div>
+            </div>
+          </div>
+
+          <div id="change-detail" style="display:none;">
+            <div class="calc-card" style="margin-bottom:16px;">
+              <div class="calc-title">選擇新乘車日期</div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div>
+                  <label class="form-label">新日期</label>
+                  <input type="date" class="form-input" id="new-date" style="width:180px;" oninput="loadNewTrains()"/>
+                </div>
+                <div>
+                  <label class="form-label">出發時間（之後）</label>
+                  <input type="time" class="form-input" id="new-time" value="06:00" style="width:140px;" oninput="loadNewTrains()"/>
+                </div>
+              </div>
+              <div id="new-trains-wrap" style="margin-top:16px;display:none;">
+                <div style="font-size:13px;font-weight:600;color:var(--color-text-sub);margin-bottom:10px;">可改搭班次</div>
+                <div class="new-train-grid" id="new-trains-list"></div>
+              </div>
+            </div>
+
+            <div id="change-calc" style="display:none;">
+              <div class="calc-card">
+                <div class="calc-title">改票確認</div>
+                <div class="calc-row"><span>原票價</span><span id="chg-orig-price">—</span></div>
+                <div class="calc-row"><span>新票價</span><span id="chg-new-price">—</span></div>
+                <div class="calc-row highlight">
+                  <span>差額</span>
+                  <span id="chg-diff">—</span>
+                </div>
+              </div>
+              <button class="confirm-btn" id="change-confirm-btn" onclick="submitChange()" style="background:var(--color-primary);">
+                確認改票
+              </button>
+            </div>
+          </div>
+
+          <div id="change-success" style="display:none;">
+            <div class="success-banner" style="background:#E8F4ED;border-color:#B8DDCA;">
+              <div class="success-banner-icon">🔄</div>
+              <div class="success-banner-text">
+                <strong>改票申請完成！</strong><br>
+                票券資訊已更新，請重新確認乘車時間。<br>
+                如有差額退款，將於 3–5 個工作天退回。
+              </div>
+            </div>
+            <button onclick="location.href='train-tickets.html'" style="padding:10px 24px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;">回到票券列表</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═══ 規則 Tab ═══ -->
+      <div class="tab-pane" id="tab-rules">
+        <div style="max-width:760px;">
+
+          <div class="rule-section">
+            <h3>📋 退票手續費計算</h3>
+            <table class="rule-table">
+              <thead>
+                <tr><th>距發車時間</th><th>手續費率</th><th>退款比例</th><th>範例（NT$176）</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>發車前 25 天以上</td><td>1%</td><td>99%</td><td>NT$174</td></tr>
+                <tr><td>發車前 3–24 天</td><td>3%</td><td>97%</td><td>NT$171</td></tr>
+                <tr><td>發車前 1–2 天</td><td>5%</td><td>95%</td><td>NT$167</td></tr>
+                <tr><td>發車當天</td><td>10%</td><td>90%</td><td>NT$158</td></tr>
+                <tr><td>已發車（誤點除外）</td><td colspan="3" style="color:var(--color-accent-red);">不受理退票</td></tr>
+              </tbody>
+            </table>
+            <div class="rule-note">
+              ※ 手續費計算以每張票為單位，最低收取 NT$10<br>
+              ※ 特定席次（太魯閣、普悠瑪）退票不另收差異費用<br>
+              ※ 退款將退回原付款方式，約需 3–5 個工作天
+            </div>
+          </div>
+
+          <div class="rule-section">
+            <h3>🔄 改票規定</h3>
+            <table class="rule-table">
+              <thead>
+                <tr><th>項目</th><th>規定</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>改票次數</td><td>每張票限改票 1 次</td></tr>
+                <tr><td>申請時限</td><td>發車前 1 小時</td></tr>
+                <tr><td>取票限制</td><td>QR Code 無限制；超商取票需於取票前申請</td></tr>
+                <tr><td>補差額</td><td>新票價 > 原票價：需補差額</td></tr>
+                <tr><td>退差額</td><td>新票價 &lt; 原票價：差額退回原付款方式</td></tr>
+                <tr><td>手續費</td><td>改票免手續費（差額依實計算）</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="rule-section">
+            <h3>⏰ 延誤補償對照表</h3>
+            <table class="rule-table">
+              <thead>
+                <tr><th>延誤時間</th><th>補償方式</th><th>申請方式</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>30 分鐘以內</td><td>不補償</td><td>—</td></tr>
+                <tr><td>30–60 分鐘</td><td>票價 50% 點數退回</td><td>App 申請 / 車站服務台</td></tr>
+                <tr><td>60 分鐘以上</td><td>票價全額點數退回</td><td>App 申請 / 車站服務台</td></tr>
+                <tr><td>取消班次</td><td>票價全額 + NT$50 補貼</td><td>自動退回原付款方式</td></tr>
+              </tbody>
+            </table>
+            <div class="rule-note">
+              ※ 延誤補償需於發生後 30 天內申請<br>
+              ※ 點數退回後可用於下次購票折抵
+            </div>
+          </div>
+
+          <div class="rule-section">
+            <h3>📞 特殊情況處理</h3>
+            <table class="rule-table">
+              <tbody>
+                <tr><td>天災/颱風停駛</td><td>免費退票，不限時間</td></tr>
+                <tr><td>個人疾病（附診斷書）</td><td>免手續費退票</td></tr>
+                <tr><td>票券遺失</td><td>憑身分證至車站補辦，補辦費 NT$50</td></tr>
+                <tr><td>誤購車票</td><td>依一般退票規則計算手續費</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+
+/* ── Tab 切換 ── */
+function showTab(id, el) {
+  document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+}
+
+/* ── 退票邏輯 ── */
+let selectedRefundTicket = null;
+
+function loadRefundTickets() {
+  const user = getCurrentUser();
+  const list = document.getElementById('refund-ticket-list');
+  if (!user) { list.innerHTML = emptyBox('請先登入'); return; }
+
+  const tickets = getTicketsByUser(user.id).filter(t => t.status === 'unused');
+  if (!tickets.length) {
+    list.innerHTML = emptyBox('目前沒有可退票的票券');
+    return;
+  }
+  list.innerHTML = tickets.map(t => ticketOptionHTML(t, 'refund')).join('');
+}
+
+function ticketOptionHTML(t, prefix) {
+  const typeLabel = { general:'一般票', student:'學生票', senior:'敬老票', disabled:'愛心票', child:'兒童票' };
+  return `
+    <label class="ticket-option" onclick="onSelectTicket('${prefix}','${escHtml(t.id)}')">
+      <input type="radio" name="${prefix}-ticket" value="${escHtml(t.id)}">
+      <div class="ticket-option-info">
+        <div class="ticket-option-route">${escHtml(t.fromStation)} → ${escHtml(t.toStation)}</div>
+        <div class="ticket-option-meta">${escHtml(t.date)} ${escHtml(t.departTime)} ｜ 車次 ${escHtml(t.trainNo)} ｜ ${escHtml(typeLabel[t.ticketType] || t.ticketType)} ｜ ${escHtml(t.passengerName)}</div>
+      </div>
+      <div class="ticket-option-price">NT$${t.price}</div>
+    </label>`;
+}
+
+function onSelectTicket(prefix, ticketId) {
+  document.querySelectorAll(`.ticket-option`).forEach(o => o.classList.remove('selected'));
+  const ticket = getTicketById(ticketId);
+  if (!ticket) return;
+
+  if (prefix === 'refund') {
+    selectedRefundTicket = ticket;
+    renderRefundCalc(ticket);
+  } else {
+    selectedChangeTicket = ticket;
+    document.getElementById('change-detail').style.display = 'block';
+    document.getElementById('change-calc').style.display = 'none';
+    document.getElementById('change-success').style.display = 'none';
+    // 預填日期
+    document.getElementById('new-date').value = ticket.date;
+    document.getElementById('new-trains-wrap').style.display = 'none';
+  }
+}
+
+function calcDaysUntil(dateStr) {
+  if (!dateStr) return 0;
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const target = new Date(dateStr);
+  target.setHours(0,0,0,0);
+  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+}
+
+function getFeeRate(days) {
+  if (days >= 25) return 0.01;
+  if (days >= 3)  return 0.03;
+  if (days >= 1)  return 0.05;
+  return 0.10;
+}
+
+function getDaysBadgeClass(days) {
+  if (days >= 25) return 'days-safe';
+  if (days >= 3)  return 'days-warn';
+  return 'days-danger';
+}
+
+function renderRefundCalc(ticket) {
+  const days     = calcDaysUntil(ticket.date);
+  const feeRate  = getFeeRate(days);
+  const fee      = Math.ceil(ticket.price * feeRate);
+  const refund   = ticket.price - fee;
+  const badgeCls = getDaysBadgeClass(days);
+
+  document.getElementById('calc-original-price').textContent = `NT$${ticket.price}`;
+  document.getElementById('calc-days').innerHTML = `<span class="days-badge ${badgeCls}">距發車 ${days} 天</span>`;
+  document.getElementById('calc-fee').textContent = `NT$${fee}（${Math.round(feeRate * 100)}%）`;
+  document.getElementById('calc-refund').textContent = `NT$${refund}`;
+
+  const warn = document.getElementById('refund-warning');
+  if (days <= 0) {
+    warn.innerHTML = `<div style="background:var(--color-danger);border:1px solid #E8A8A5;border-radius:var(--radius-md);padding:10px 14px;font-size:13px;color:var(--color-danger-text);">⚠️ 今日發車班次，退票手續費最高（10%）。</div>`;
+    document.getElementById('refund-confirm-btn').disabled = false;
+  } else {
+    warn.innerHTML = '';
+    document.getElementById('refund-confirm-btn').disabled = false;
+  }
+
+  document.getElementById('refund-calc').style.display = 'block';
+}
+
+function submitRefund() {
+  if (!selectedRefundTicket) return;
+  const ticket = getTicketById(selectedRefundTicket.id);
+  if (!ticket || ticket.status !== 'unused') { alert('此票券無法退票'); return; }
+
+  if (!confirm(`確認退票？\n${ticket.fromStation} → ${ticket.toStation}（${ticket.date}）\n票款將於 3–5 個工作天退回。`)) return;
+
+  ticket.status = 'refunded';
+  saveTicket(ticket);
+
+  document.getElementById('refund-order-id').textContent = ticket.orderId;
+  document.getElementById('refund-calc').style.display = 'none';
+  document.getElementById('refund-success').style.display = 'block';
+  document.getElementById('refund-ticket-list').innerHTML = '';
+  loadRefundTickets();
+  selectedRefundTicket = null;
+}
+
+/* ── 改票邏輯 ── */
+let selectedChangeTicket = null;
+let selectedNewTrain     = null;
+
+function loadChangeTickets() {
+  const user = getCurrentUser();
+  const list = document.getElementById('change-ticket-list');
+  if (!user) { list.innerHTML = emptyBox('請先登入'); return; }
+
+  const tickets = getTicketsByUser(user.id).filter(t => t.status === 'unused');
+  if (!tickets.length) {
+    list.innerHTML = emptyBox('目前沒有可改票的票券');
+    return;
+  }
+  list.innerHTML = tickets.map(t => ticketOptionHTML(t, 'change')).join('');
+}
+
+/* 可改搭班次（模擬，與出發站路線相同的班次）*/
+const MOCK_TRAINS_BY_ROUTE = [
+  { trainNo:'4008', type:'區間車', depart:'06:20', price:63 },
+  { trainNo:'4012', type:'區間車', depart:'07:10', price:63 },
+  { trainNo:'109',  type:'自強號', depart:'07:45', price:107 },
+  { trainNo:'4016', type:'區間車', depart:'08:05', price:63 },
+  { trainNo:'1129', type:'莒光號', depart:'08:40', price:90 },
+  { trainNo:'4020', type:'區間車', depart:'09:15', price:63 },
+  { trainNo:'113',  type:'自強號', depart:'10:00', price:107 },
+  { trainNo:'4024', type:'區間車', depart:'10:30', price:63 },
+  { trainNo:'1133', type:'莒光號', depart:'11:10', price:90 },
+  { trainNo:'4028', type:'區間車', depart:'11:50', price:63 },
+  { trainNo:'4032', type:'區間車', depart:'13:05', price:63 },
+  { trainNo:'1137', type:'莒光號', depart:'14:00', price:90 },
+  { trainNo:'4036', type:'區間車', depart:'14:40', price:63 },
+  { trainNo:'4040', type:'區間車', depart:'15:30', price:63 },
+  { trainNo:'1141', type:'莒光號', depart:'16:15', price:90 },
+  { trainNo:'4044', type:'區間車', depart:'17:05', price:63 },
+  { trainNo:'4048', type:'區間車', depart:'18:00', price:63 },
+];
+
+function loadNewTrains() {
+  const newDate = document.getElementById('new-date').value;
+  const newTime = document.getElementById('new-time').value || '00:00';
+  if (!newDate || !selectedChangeTicket) return;
+
+  const afterMins = parseInt(newTime.split(':')[0]) * 60 + parseInt(newTime.split(':')[1]);
+  const trains = MOCK_TRAINS_BY_ROUTE.filter(t => {
+    const [h, m] = t.depart.split(':').map(Number);
+    return h * 60 + m >= afterMins;
+  }).slice(0, 6);
+
+  if (!trains.length) {
+    document.getElementById('new-trains-list').innerHTML = '<div style="font-size:13px;color:var(--color-text-light);">此時段無可搭班次</div>';
+  } else {
+    document.getElementById('new-trains-list').innerHTML = trains.map(t => newTrainOptionHTML(t)).join('');
+  }
+  document.getElementById('new-trains-wrap').style.display = 'block';
+  document.getElementById('change-calc').style.display = 'none';
+  selectedNewTrain = null;
+}
+
+function newTrainOptionHTML(t) {
+  return `
+    <div class="new-train-option" onclick="selectNewTrain(${escHtml(JSON.stringify(t))}, this)">
+      <div class="new-train-time">${escHtml(t.depart)}</div>
+      <div class="new-train-no">${escHtml(t.trainNo)}</div>
+      <div class="new-train-type">${escHtml(t.type)}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--color-accent-red);margin-top:4px;">NT$${t.price}</div>
+    </div>`;
+}
+
+function selectNewTrain(trainObj, el) {
+  selectedNewTrain = trainObj;
+  document.querySelectorAll('.new-train-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  renderChangeCalc();
+}
+
+function renderChangeCalc() {
+  if (!selectedChangeTicket || !selectedNewTrain) return;
+  const origPrice = selectedChangeTicket.price;
+  const newPrice  = selectedNewTrain.price;
+  const diff      = newPrice - origPrice;
+
+  document.getElementById('chg-orig-price').textContent = `NT$${origPrice}`;
+  document.getElementById('chg-new-price').textContent  = `NT$${newPrice}`;
+
+  const diffEl = document.getElementById('chg-diff');
+  if (diff > 0) {
+    diffEl.innerHTML = `<span class="diff-positive">需補 NT$${diff}</span>`;
+  } else if (diff < 0) {
+    diffEl.innerHTML = `<span class="diff-negative">退回 NT$${Math.abs(diff)}</span>`;
+  } else {
+    diffEl.innerHTML = `<span class="diff-zero">無差額</span>`;
+  }
+  document.getElementById('change-calc').style.display = 'block';
+}
+
+function submitChange() {
+  if (!selectedChangeTicket || !selectedNewTrain) return;
+  const newDate = document.getElementById('new-date').value;
+  const ticket = getTicketById(selectedChangeTicket.id);
+  if (!ticket) return;
+
+  if (!confirm(`確認改票至 ${newDate} ${selectedNewTrain.depart} 車次 ${selectedNewTrain.trainNo}？`)) return;
+
+  ticket.trainNo    = selectedNewTrain.trainNo;
+  ticket.trainType  = selectedNewTrain.type;
+  ticket.departTime = selectedNewTrain.depart;
+  ticket.date       = newDate;
+  ticket.price      = selectedNewTrain.price;
+  saveTicket(ticket);
+
+  document.getElementById('change-detail').style.display = 'none';
+  document.getElementById('change-success').style.display = 'block';
+  document.getElementById('change-ticket-list').innerHTML = '';
+  loadChangeTickets();
+  selectedChangeTicket = null;
+  selectedNewTrain = null;
+}
+
+function emptyBox(msg) {
+  return `<div class="empty-box"><div class="icon">🎫</div><div style="font-size:13px;">${escHtml(msg)}</div></div>`;
+}
+
+/* ── 讀取 URL 參數（從票券頁直接跳入）── */
+function initFromURL() {
+  const sp = new URLSearchParams(location.search);
+  const preId = sp.get('ticketId');
+  if (preId) {
+    const ticket = getTicketById(preId);
+    if (ticket && ticket.status === 'unused') {
+      selectedRefundTicket = ticket;
+      // 選取對應的 radio
+      setTimeout(() => {
+        const radio = document.querySelector(`input[value="${preId}"]`);
+        if (radio) {
+          radio.checked = true;
+          radio.closest('.ticket-option')?.classList.add('selected');
+        }
+        renderRefundCalc(ticket);
+      }, 100);
+    }
+  }
+}
+
+/* ── 初始化 ── */
+(function() {
+  const user = getCurrentUser();
+  if (!user) { window.location.href = 'login.html'; return; }
+  renderNav();
+  renderFooter();
+  loadRefundTickets();
+  loadChangeTickets();
+  initFromURL();
+})();
+</script>
 </body>
 </html>
