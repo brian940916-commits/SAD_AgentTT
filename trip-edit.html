@@ -172,6 +172,12 @@
     /* ── Empty state ── */
     .day-empty { text-align: center; padding: var(--space-2xl) var(--space-lg); color: var(--color-text-light); }
     .day-empty-icon { font-size: 36px; margin-bottom: var(--space-sm); }
+
+    @media (max-width: 768px) {
+      .edit-header { position: static; }
+      .day-tabs-wrap { position: static; }
+      .content-inner { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>

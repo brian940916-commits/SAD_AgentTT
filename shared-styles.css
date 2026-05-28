@@ -1101,3 +1101,53 @@ ul, ol {
   from { transform: translateX(110%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
 }
+
+/* ── RWD ─────────────────────────────────────────────────── */
+
+/* 漢堡按鈕：桌機隱藏 */
+.navbar-hamburger { display: none; }
+
+@media (max-width: 768px) {
+  /* 版面容器 */
+  .page-container { padding: 0 16px; }
+
+  /* 格線系統 */
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .col-span-2 { grid-column: span 1; }
+
+  /* 導覽列：漢堡選單佈局 */
+  .navbar-inner {
+    padding: 8px 16px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+    gap: 0;
+  }
+  .navbar-brand    { flex: 1; }
+  .navbar-right    { order: 2; margin-left: 0; }
+  .navbar-hamburger {
+    display: flex;
+    order: 3;
+    margin-left: 8px;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--color-secondary);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 4px 6px;
+    line-height: 1;
+  }
+  .navbar-links {
+    order: 4;
+    display: none;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 8px 0 12px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    gap: 2px;
+  }
+  .navbar-links.mobile-open { display: flex; }
+}

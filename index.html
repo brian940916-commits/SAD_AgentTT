@@ -177,6 +177,20 @@
     .cta-title { font-size: 28px; font-weight: 700; color: #FAF6EC; margin-bottom: 12px; }
     .cta-sub   { font-size: 15px; color: #C5B886; margin-bottom: var(--space-xl); line-height: 1.8; }
     .cta-btns  { display: flex; gap: var(--space-md); justify-content: center; flex-wrap: wrap; }
+
+    @media (max-width: 768px) {
+      .hero { padding: 40px 16px 0; min-height: auto; }
+      .hero-inner { grid-template-columns: 1fr; gap: 24px; padding-bottom: 40px; }
+      .hero-svg-wrap { display: none; }
+      .hero-title { font-size: 32px; }
+      .hero-search { flex-direction: column; }
+      .modules-section { padding: 40px 16px; }
+      .modules-grid { grid-template-columns: 1fr; }
+      .stations-section { padding: 40px 16px; }
+      .stations-grid { grid-template-columns: 1fr; }
+      .cta-section { padding: 40px 16px; }
+      .cta-title { font-size: 22px; }
+    }
   </style>
 </head>
 <body>

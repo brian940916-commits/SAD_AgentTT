@@ -159,6 +159,10 @@ function renderNav() {
           ${_rightSection(user)}
         </div>
 
+        <!-- 漢堡按鈕（手機版） -->
+        <button class="navbar-hamburger" id="nav-hamburger"
+                aria-label="展開選單" aria-expanded="false">☰</button>
+
       </div>
     </nav>`;
 
@@ -196,11 +200,35 @@ function _bindNavEvents() {
     });
   }
 
-  /* 點擊外部關閉下拉 */
+  /* 漢堡選單切換 */
+  const hamburger = document.getElementById('nav-hamburger');
+  const navLinks  = document.querySelector('#navbar .navbar-links');
+  if (hamburger && navLinks) {
+    hamburger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = navLinks.classList.toggle('mobile-open');
+      hamburger.textContent = isOpen ? '✕' : '☰';
+      hamburger.setAttribute('aria-expanded', String(isOpen));
+    });
+    navLinks.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        navLinks.classList.remove('mobile-open');
+        hamburger.textContent = '☰';
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  /* 點擊外部關閉下拉與漢堡選單 */
   document.addEventListener('click', () => {
     if (dropdown) {
       dropdown.classList.add('hidden');
       if (avatar) avatar.setAttribute('aria-expanded', 'false');
+    }
+    if (navLinks && hamburger) {
+      navLinks.classList.remove('mobile-open');
+      hamburger.textContent = '☰';
+      hamburger.setAttribute('aria-expanded', 'false');
     }
   }, { capture: false });
 }

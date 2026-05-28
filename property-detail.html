@@ -204,6 +204,17 @@
     /* ── Toast ── */
     .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #2C4A3E; color: #fff; padding: 10px 24px; border-radius: var(--radius-xl); font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9999; }
     .toast.show { opacity: 1; }
+
+    @media (max-width: 768px) {
+      .photo-grid { grid-template-columns: 1fr 1fr; grid-template-rows: 140px 140px; }
+      .photo-cell:first-child { grid-row: auto; font-size: 50px; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .booking-card { position: static; }
+      .facility-grid { grid-template-columns: 1fr 1fr; }
+      .policy-grid { grid-template-columns: 1fr; }
+      .date-grid { grid-template-columns: 1fr; }
+      .review-summary { flex-direction: column; gap: 16px; }
+    }
   </style>
 </head>
 <body>
