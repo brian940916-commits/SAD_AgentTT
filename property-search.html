@@ -5,16 +5,687 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 房源搜尋</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── 搜尋列 ── */
+    .search-bar-wrap {
+      background: var(--color-primary);
+      padding: var(--space-lg) 0;
+      position: sticky; top: 60px; z-index: 85;
+    }
+    .search-bar-inner {
+      display: flex; gap: var(--space-sm); align-items: flex-end; flex-wrap: wrap;
+    }
+    .search-field { display: flex; flex-direction: column; gap: 4px; }
+    .search-field label { font-size: 11px; color: rgba(255,255,255,.7); font-weight: 500; }
+    .search-input {
+      padding: 8px 12px; border-radius: var(--radius-md);
+      border: none; font-family: var(--font-main); font-size: 14px;
+      background: rgba(255,255,255,.15); color: #fff; min-width: 0;
+    }
+    .search-input::placeholder { color: rgba(255,255,255,.5); }
+    .search-input option { color: #333; background: #fff; }
+    .search-btn {
+      padding: 8px 24px; background: var(--color-accent-yellow);
+      color: var(--color-text-main); border: none; border-radius: var(--radius-md);
+      font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--font-main);
+      transition: opacity .15s; align-self: flex-end;
+    }
+    .search-btn:hover { opacity: .85; }
+
+    /* ── 購物車浮動按鈕 ── */
+    .cart-float {
+      position: fixed; top: 90px; right: 24px; z-index: 200;
+      background: var(--color-primary); color: #fff;
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; cursor: pointer; box-shadow: var(--shadow-hover);
+      transition: transform .15s;
+    }
+    .cart-float:hover { transform: scale(1.08); }
+    .cart-badge {
+      position: absolute; top: -4px; right: -4px;
+      background: var(--color-accent-red); color: #fff;
+      font-size: 11px; font-weight: 700;
+      width: 18px; height: 18px; border-radius: 50%;
+      display: none; align-items: center; justify-content: center;
+    }
+    .cart-badge.show { display: flex; }
+
+    /* ── 主內容：兩欄 ── */
+    .content-area { padding: var(--space-xl) 0 var(--space-3xl); }
+    .content-cols  { display: grid; grid-template-columns: 260px 1fr; gap: var(--space-xl); align-items: start; }
+
+    /* ── 左側篩選欄 ── */
+    .filter-panel {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); padding: var(--space-lg);
+      position: sticky; top: calc(60px + 72px + 16px);
+    }
+    .filter-title { font-size: 15px; font-weight: 700; color: var(--color-text-main); margin-bottom: var(--space-md); }
+    .filter-section { margin-bottom: var(--space-lg); }
+    .filter-section-title { font-size: 12px; font-weight: 600; color: var(--color-text-sub); letter-spacing: 1px; margin-bottom: var(--space-sm); }
+    .filter-radio, .filter-check {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--color-text-main); cursor: pointer;
+      margin-bottom: 6px;
+    }
+    .filter-radio input, .filter-check input { accent-color: var(--color-primary); }
+    .range-wrap { padding: 4px 0; }
+    .range-input { width: 100%; accent-color: var(--color-primary); cursor: pointer; }
+    .range-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--color-text-light); margin-top: 4px; }
+    .price-display { font-size: 13px; color: var(--color-primary); font-weight: 600; margin-bottom: 6px; }
+    .filter-reset { width: 100%; padding: 7px; border: 1.5px solid var(--color-border); background: none; border-radius: var(--radius-md); font-size: 13px; color: var(--color-text-sub); cursor: pointer; font-family: var(--font-main); transition: all .15s; }
+    .filter-reset:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+    /* ── 結果列表 ── */
+    .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-md); }
+    .results-count { font-size: 14px; color: var(--color-text-sub); }
+    .results-count strong { color: var(--color-text-main); }
+    .sort-select { padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 13px; font-family: var(--font-main); color: var(--color-text-main); background: #fff; }
+
+    /* ── 房源卡片 ── */
+    .prop-card {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); overflow: hidden;
+      display: grid; grid-template-columns: 220px 1fr;
+      margin-bottom: var(--space-md); transition: box-shadow .15s;
+    }
+    .prop-card:hover { box-shadow: var(--shadow-hover); }
+    .prop-thumb {
+      height: 100%; min-height: 160px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 64px; position: relative;
+    }
+    .discount-tag {
+      position: absolute; top: 10px; left: 10px;
+      background: var(--color-accent-red); color: #fff;
+      font-size: 11px; font-weight: 700; padding: 3px 8px;
+      border-radius: var(--radius-sm);
+    }
+    .fav-btn {
+      position: absolute; top: 10px; right: 10px;
+      background: rgba(255,255,255,.9); border: none; border-radius: 50%;
+      width: 32px; height: 32px; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .15s; box-shadow: 0 1px 4px rgba(0,0,0,.15);
+    }
+    .fav-btn:hover { transform: scale(1.15); }
+    .prop-body { padding: var(--space-md); display: flex; flex-direction: column; }
+    .prop-tags { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin-bottom: var(--space-sm); }
+    .prop-tag {
+      font-size: 11px; padding: 2px 8px; border-radius: var(--radius-sm);
+      background: var(--color-success); color: var(--color-success-text); font-weight: 500;
+    }
+    .prop-tag.highlight { background: var(--color-warning); color: var(--color-warning-text); }
+    .prop-name { font-size: 17px; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px; }
+    .prop-station { font-size: 13px; color: var(--color-text-sub); margin-bottom: var(--space-sm); }
+    .prop-meta { display: flex; gap: var(--space-md); font-size: 13px; color: var(--color-text-sub); margin-bottom: var(--space-sm); flex-wrap: wrap; }
+    .prop-rating { color: var(--color-accent-yellow); font-weight: 700; }
+    .prop-rating span { color: var(--color-text-sub); font-weight: 400; font-size: 12px; }
+    .prop-facilities { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin-bottom: var(--space-md); }
+    .prop-facility-tag { font-size: 11px; background: #f5f3ec; color: var(--color-text-sub); padding: 2px 8px; border-radius: var(--radius-sm); }
+    .prop-footer { display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; }
+    .prop-price-wrap { }
+    .prop-price-label { font-size: 11px; color: var(--color-text-light); }
+    .prop-price { font-size: 22px; font-weight: 700; color: var(--color-primary); }
+    .prop-price small { font-size: 13px; font-weight: 400; color: var(--color-text-sub); }
+    .prop-price-sub { font-size: 11px; color: var(--color-accent-red); margin-top: 2px; }
+    .prop-actions { display: flex; gap: var(--space-sm); }
+
+    /* ── 空狀態 ── */
+    .no-results { text-align: center; padding: var(--space-3xl); color: var(--color-text-light); }
+    .no-results-icon { font-size: 48px; margin-bottom: var(--space-sm); }
+
+    /* ── 購物車側欄 ── */
+    .cart-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.4);
+      z-index: 300; opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .cart-overlay.open { opacity: 1; pointer-events: all; }
+    .cart-panel {
+      position: fixed; top: 0; right: -420px; width: 400px; height: 100%;
+      background: #fff; z-index: 310;
+      box-shadow: -4px 0 24px rgba(0,0,0,.15);
+      display: flex; flex-direction: column;
+      transition: right .28s cubic-bezier(.4,0,.2,1);
+    }
+    .cart-panel.open { right: 0; }
+    .cart-panel-head {
+      padding: var(--space-lg); border-bottom: 1px solid var(--color-border-light);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .cart-panel-title { font-size: 16px; font-weight: 700; color: var(--color-text-main); }
+    .cart-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--color-text-sub); }
+    .cart-panel-body { flex: 1; overflow-y: auto; padding: var(--space-md); }
+    .cart-item {
+      background: var(--color-secondary); border-radius: var(--radius-md);
+      padding: var(--space-md); margin-bottom: var(--space-sm); position: relative;
+    }
+    .cart-item-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); margin-bottom: 4px; }
+    .cart-item-meta { font-size: 12px; color: var(--color-text-sub); line-height: 1.8; }
+    .cart-item-price { font-size: 15px; font-weight: 700; color: var(--color-primary); margin-top: 6px; }
+    .cart-item-del {
+      position: absolute; top: 8px; right: 8px;
+      background: none; border: none; font-size: 16px; cursor: pointer;
+      color: var(--color-text-light); transition: color .15s;
+    }
+    .cart-item-del:hover { color: var(--color-accent-red); }
+    .cart-discount-tip {
+      background: var(--color-warning); border: 1px solid #D4C070;
+      border-radius: var(--radius-md); padding: 10px 12px;
+      font-size: 12px; color: var(--color-warning-text);
+      display: flex; gap: 6px; align-items: flex-start;
+      margin-bottom: var(--space-sm);
+    }
+    .cart-empty { text-align: center; padding: var(--space-3xl) var(--space-md); color: var(--color-text-light); }
+    .cart-empty-icon { font-size: 40px; margin-bottom: var(--space-sm); }
+    .cart-panel-foot {
+      padding: var(--space-md); border-top: 1px solid var(--color-border-light);
+    }
+    .cart-total-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--color-text-sub); margin-bottom: 6px; }
+    .cart-total-row.main { font-size: 16px; font-weight: 700; color: var(--color-text-main); margin-bottom: var(--space-md); }
+    .cart-total-val { color: var(--color-primary); }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #2C4A3E; color: #fff; padding: 10px 24px; border-radius: var(--radius-xl); font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9999; }
+    .toast.show { opacity: 1; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<!-- 搜尋列 -->
+<div class="search-bar-wrap">
+  <div class="page-container">
+    <div class="search-bar-inner">
+      <div class="search-field" style="flex:1;min-width:120px;">
+        <label>目的地車站</label>
+        <select class="search-input" id="s-station">
+          <option value="">全部車站</option>
+          <option value="集集站">集集站</option>
+          <option value="彰化站">彰化站</option>
+          <option value="車埕站">車埕站</option>
+          <option value="二水站">二水站</option>
+          <option value="水里站">水里站</option>
+          <option value="源泉站">源泉站</option>
+          <option value="濁水站">濁水站</option>
+        </select>
+      </div>
+      <div class="search-field">
+        <label>入住日期</label>
+        <input class="search-input" type="date" id="s-checkin" style="min-width:130px;">
+      </div>
+      <div class="search-field">
+        <label>退房日期</label>
+        <input class="search-input" type="date" id="s-checkout" style="min-width:130px;">
+      </div>
+      <div class="search-field">
+        <label>人數</label>
+        <input class="search-input" type="number" id="s-guests" value="2" min="1" max="10" style="width:70px;">
+      </div>
+      <button class="search-btn" onclick="doSearch()">🔍 搜尋</button>
+    </div>
+  </div>
+</div>
+
+<!-- 購物車浮動按鈕 -->
+<div class="cart-float" onclick="openCart()" title="購物車" role="button" aria-label="購物車">
+  🛒
+  <div class="cart-badge" id="cart-badge">0</div>
+</div>
+
+<div id="app">
+  <div class="content-area">
+    <div class="page-container">
+      <div class="content-cols">
+
+        <!-- 左側篩選欄 -->
+        <aside>
+          <div class="filter-panel">
+            <div class="filter-title">🔎 篩選條件</div>
+
+            <!-- 房型 -->
+            <div class="filter-section">
+              <div class="filter-section-title">房型</div>
+              <label class="filter-radio"><input type="radio" name="f-room" value="" checked onchange="applyFilters()"> 全部</label>
+              <label class="filter-radio"><input type="radio" name="f-room" value="雙人房" onchange="applyFilters()"> 雙人房</label>
+              <label class="filter-radio"><input type="radio" name="f-room" value="家庭房" onchange="applyFilters()"> 家庭房</label>
+              <label class="filter-radio"><input type="radio" name="f-room" value="標準單人房" onchange="applyFilters()"> 單人房</label>
+            </div>
+
+            <!-- 價格區間 -->
+            <div class="filter-section">
+              <div class="filter-section-title">每晚價格上限</div>
+              <div class="price-display" id="price-display">NT$ 5,000 以下</div>
+              <div class="range-wrap">
+                <input class="range-input" type="range" id="f-price" min="500" max="6000" step="100" value="6000" oninput="onPriceRange()">
+              </div>
+              <div class="range-labels"><span>NT$500</span><span>NT$6,000</span></div>
+            </div>
+
+            <!-- 距車站距離 -->
+            <div class="filter-section">
+              <div class="filter-section-title">距車站距離</div>
+              <label class="filter-radio"><input type="radio" name="f-dist" value="99" checked onchange="applyFilters()"> 全部</label>
+              <label class="filter-radio"><input type="radio" name="f-dist" value="0.5" onchange="applyFilters()"> 500 公尺內</label>
+              <label class="filter-radio"><input type="radio" name="f-dist" value="1" onchange="applyFilters()"> 1 公里內</label>
+              <label class="filter-radio"><input type="radio" name="f-dist" value="3" onchange="applyFilters()"> 3 公里內</label>
+            </div>
+
+            <!-- 設備 -->
+            <div class="filter-section">
+              <div class="filter-section-title">設備</div>
+              <label class="filter-check"><input type="checkbox" value="Wi-Fi"    onchange="applyFilters()"> Wi-Fi</label>
+              <label class="filter-check"><input type="checkbox" value="停車場"   onchange="applyFilters()"> 停車場</label>
+              <label class="filter-check"><input type="checkbox" value="早餐"     onchange="applyFilters()"> 含早餐</label>
+              <label class="filter-check"><input type="checkbox" value="冷氣"     onchange="applyFilters()"> 冷氣</label>
+            </div>
+
+            <!-- 最低評價 -->
+            <div class="filter-section">
+              <div class="filter-section-title">最低評價</div>
+              <label class="filter-radio"><input type="radio" name="f-rating" value="0" checked onchange="applyFilters()"> 全部</label>
+              <label class="filter-radio"><input type="radio" name="f-rating" value="4.5" onchange="applyFilters()"> ⭐ 4.5 以上</label>
+              <label class="filter-radio"><input type="radio" name="f-rating" value="4.0" onchange="applyFilters()"> ⭐ 4.0 以上</label>
+            </div>
+
+            <button class="filter-reset" onclick="resetFilters()">清除篩選條件</button>
+          </div>
+        </aside>
+
+        <!-- 右側結果 -->
+        <div>
+          <div class="results-header">
+            <div class="results-count" id="results-count"></div>
+            <select class="sort-select" id="sort-select" onchange="applyFilters()">
+              <option value="rating">依評分排序</option>
+              <option value="price_asc">價格低→高</option>
+              <option value="price_desc">價格高→低</option>
+              <option value="distance">距離最近</option>
+            </select>
+          </div>
+          <div id="results-list"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 購物車側欄 -->
+<div class="cart-overlay" id="cart-overlay" onclick="closeCart()"></div>
+<div class="cart-panel" id="cart-panel" role="dialog" aria-label="購物車" aria-modal="true">
+  <div class="cart-panel-head">
+    <div class="cart-panel-title">🛒 購物車</div>
+    <button class="cart-close" onclick="closeCart()" aria-label="關閉">✕</button>
+  </div>
+  <div class="cart-panel-body" id="cart-body"><!-- 動態填入 --></div>
+  <div class="cart-panel-foot" id="cart-foot" style="display:none;">
+    <div class="cart-total-row"><span>小計</span><span class="cart-total-val" id="cart-subtotal"></span></div>
+    <div class="cart-total-row" id="cart-discount-row" style="display:none;">
+      <span>八折優惠折扣</span><span style="color:var(--color-accent-red);" id="cart-discount-val"></span>
+    </div>
+    <div class="cart-total-row main"><span>合計</span><span class="cart-total-val" id="cart-total"></span></div>
+    <a id="checkout-btn" href="property-cart.html" class="btn btn-primary btn-full" style="text-align:center;">前往結帳 →</a>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div id="footer-container"></div>
+
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+  renderNav();
+  renderFooter();
+
+  /* ── 頁面保護 ── */
+  const currentUser = getCurrentUser();
+  if (!currentUser) { window.location.href = 'login.html'; }
+
+  /* ── 工具 ── */
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function showToast(msg, ms = 2200) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), ms);
+  }
+
+  /* ── 房源展示擴充資料 ── */
+  const PROP_DISPLAY = {
+    prop_01: { distance: 0.3, emoji: '🏡', bg: '#E8F4ED', tags: ['熱門推薦'] },
+    prop_02: { distance: 0.5, emoji: '🌲', bg: '#F0E5BC', tags: ['特色民宿'] },
+    prop_03: { distance: 0.2, emoji: '🚂', bg: '#FBEAEA', tags: ['鐵道主題'] },
+  };
+  function propDisplay(id) {
+    return PROP_DISPLAY[id] || { distance: 1.0, emoji: '🏠', bg: '#f5f3ec', tags: [] };
+  }
+
+  /* ── 購物車 (localStorage agenttt_cart) ── */
+  const CART_KEY = 'agenttt_cart';
+  function getCart()         { try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch { return []; } }
+  function setCart(c)        { localStorage.setItem(CART_KEY, JSON.stringify(c)); }
+  function cartCount()       { return getCart().length; }
+
+  /* ── 狀態 ── */
+  let allProperties  = [];    // 全部 online 房源
+  let filteredProps  = [];    // 篩選後結果
+  let searchStation  = '';
+  let searchCheckIn  = '';
+  let searchCheckOut = '';
+  let searchGuests   = 2;
+
+  /* ── 初始化預設日期 ── */
+  (function setDefaultDates() {
+    const today = new Date();
+    const checkin  = new Date(today); checkin.setDate(today.getDate() + 7);
+    const checkout = new Date(today); checkout.setDate(today.getDate() + 9);
+    const fmt = d => d.toISOString().slice(0, 10);
+    document.getElementById('s-checkin').value  = fmt(checkin);
+    document.getElementById('s-checkout').value = fmt(checkout);
+    searchCheckIn  = fmt(checkin);
+    searchCheckOut = fmt(checkout);
+  })();
+
+  /* ── 初始化 ── */
+  function init() {
+    allProperties = getProperties().filter(p => p.status === 'online');
+    updateCartBadge();
+
+    // URL 參數預填
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('station')) {
+      document.getElementById('s-station').value = params.get('station');
+      searchStation = params.get('station');
+    }
+    if (params.get('checkin'))  { document.getElementById('s-checkin').value  = params.get('checkin');  searchCheckIn  = params.get('checkin'); }
+    if (params.get('checkout')) { document.getElementById('s-checkout').value = params.get('checkout'); searchCheckOut = params.get('checkout'); }
+    if (params.get('guests'))   { document.getElementById('s-guests').value   = params.get('guests');   searchGuests   = Number(params.get('guests')); }
+
+    applyFilters();
+  }
+
+  /* ── 搜尋按鈕 ── */
+  function doSearch() {
+    searchStation  = document.getElementById('s-station').value;
+    searchCheckIn  = document.getElementById('s-checkin').value;
+    searchCheckOut = document.getElementById('s-checkout').value;
+    searchGuests   = Number(document.getElementById('s-guests').value) || 1;
+    applyFilters();
+  }
+
+  /* ── 篩選邏輯 ── */
+  function applyFilters() {
+    const roomType  = document.querySelector('input[name="f-room"]:checked')?.value   || '';
+    const maxPrice  = Number(document.getElementById('f-price').value);
+    const maxDist   = Number(document.querySelector('input[name="f-dist"]:checked')?.value || 99);
+    const minRating = Number(document.querySelector('input[name="f-rating"]:checked')?.value || 0);
+    const reqFacs   = [...document.querySelectorAll('.filter-check input:checked')].map(el => el.value);
+    const sortBy    = document.getElementById('sort-select').value;
+
+    let result = allProperties.slice();
+
+    // 車站篩選
+    if (searchStation) result = result.filter(p => p.station === searchStation);
+
+    // 人數篩選
+    if (searchGuests) result = result.filter(p => p.maxGuests >= searchGuests);
+
+    // 房型
+    if (roomType) result = result.filter(p => p.roomType === roomType);
+
+    // 價格上限 (以平日價)
+    result = result.filter(p => p.priceWeekday <= maxPrice);
+
+    // 距離
+    result = result.filter(p => (propDisplay(p.id).distance || 1) <= maxDist);
+
+    // 設備
+    if (reqFacs.length) result = result.filter(p => reqFacs.every(f => (p.facilities || []).includes(f)));
+
+    // 評價
+    if (minRating > 0) result = result.filter(p => (p.rating || 0) >= minRating);
+
+    // 排序
+    if (sortBy === 'rating')     result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    if (sortBy === 'price_asc')  result.sort((a, b) => a.priceWeekday - b.priceWeekday);
+    if (sortBy === 'price_desc') result.sort((a, b) => b.priceWeekday - a.priceWeekday);
+    if (sortBy === 'distance')   result.sort((a, b) => (propDisplay(a.id).distance || 1) - (propDisplay(b.id).distance || 1));
+
+    filteredProps = result;
+    renderResults();
+  }
+
+  /* ── 渲染結果 ── */
+  function renderResults() {
+    const faves  = getFavorites();
+    const nights = calcNights();
+
+    document.getElementById('results-count').innerHTML =
+      `找到 <strong>${filteredProps.length}</strong> 間房源` +
+      (searchStation ? `・<strong>${escHtml(searchStation)}</strong>` : '') +
+      (nights > 0 ? `・<strong>${nights} 晚</strong>` : '');
+
+    const list = document.getElementById('results-list');
+    if (!filteredProps.length) {
+      list.innerHTML = `
+        <div class="no-results">
+          <div class="no-results-icon">🏠</div>
+          <p>找不到符合條件的房源</p>
+          <p style="font-size:13px;margin-top:4px;">試著放寬篩選條件或更換車站</p>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = filteredProps.map(p => {
+      const d      = propDisplay(p.id);
+      const isFav  = faves.includes(p.id);
+      const stars  = '★'.repeat(Math.round(p.rating || 0)) + '☆'.repeat(5 - Math.round(p.rating || 0));
+      const hasDiscount = nights >= 2;
+      return `
+        <div class="prop-card" id="card-${escHtml(p.id)}">
+          <div class="prop-thumb" style="background:${d.bg};">
+            <span>${d.emoji}</span>
+            ${hasDiscount ? `<span class="discount-tag">訂2晚8折</span>` : ''}
+            <button class="fav-btn" onclick="toggleFav(event,'${escHtml(p.id)}')" title="${isFav ? '取消收藏' : '加入收藏'}" aria-label="${isFav ? '取消收藏' : '加入收藏'}">
+              ${isFav ? '❤️' : '🤍'}
+            </button>
+          </div>
+          <div class="prop-body">
+            <div class="prop-tags">
+              ${d.tags.map(t => `<span class="prop-tag highlight">${escHtml(t)}</span>`).join('')}
+              <span class="prop-tag">${escHtml(p.roomType)}</span>
+              ${(p.facilities||[]).slice(0,3).map(f => `<span class="prop-tag">${escHtml(f)}</span>`).join('')}
+            </div>
+            <div class="prop-name">${escHtml(p.name)}</div>
+            <div class="prop-station">📍 ${escHtml(p.station)}・距車站 ${d.distance} 公里</div>
+            <div class="prop-meta">
+              <span class="prop-rating">${stars} ${p.rating || '—'}<span>（${p.reviewCount || 0} 則評價）</span></span>
+              <span>最多 ${p.maxGuests} 人</span>
+            </div>
+            <div class="prop-facilities">
+              ${(p.facilities||[]).map(f => `<span class="prop-facility-tag">${escHtml(f)}</span>`).join('')}
+            </div>
+            <div class="prop-footer">
+              <div class="prop-price-wrap">
+                <div class="prop-price-label">每晚起</div>
+                <div class="prop-price">NT$ ${p.priceWeekday.toLocaleString()}<small> / 晚</small></div>
+                ${hasDiscount ? `<div class="prop-price-sub">🎉 訂 ${nights} 晚享 8 折，總計約 NT$ ${Math.round(p.priceWeekday * nights * 0.8).toLocaleString()}</div>` : ''}
+              </div>
+              <div class="prop-actions">
+                <a href="property-detail.html?id=${escHtml(p.id)}" class="btn btn-outline btn-sm">查看詳情</a>
+                <button class="btn btn-primary btn-sm" onclick="addToCart('${escHtml(p.id)}')">加入購物車</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ── 計算住宿晚數 ── */
+  function calcNights() {
+    if (!searchCheckIn || !searchCheckOut) return 0;
+    const diff = (new Date(searchCheckOut) - new Date(searchCheckIn)) / 86400000;
+    return diff > 0 ? diff : 0;
+  }
+
+  /* ── 收藏 ── */
+  function toggleFav(event, propId) {
+    event.stopPropagation();
+    const added = toggleFavorite(propId);
+    const btn   = event.currentTarget;
+    btn.textContent = added ? '❤️' : '🤍';
+    btn.title       = added ? '取消收藏' : '加入收藏';
+    showToast(added ? '❤️ 已加入收藏' : '🤍 已移除收藏');
+  }
+
+  /* ── 加入購物車 ── */
+  function addToCart(propId) {
+    const prop   = allProperties.find(p => p.id === propId);
+    if (!prop) return;
+    const nights = calcNights();
+    if (nights <= 0) { showToast('⚠️ 請先設定入住/退房日期再加入購物車'); return; }
+
+    const cart = getCart();
+    if (cart.some(c => c.propertyId === propId && c.checkIn === searchCheckIn)) {
+      showToast('此房源已在購物車中'); return;
+    }
+
+    const pricePerNight  = prop.priceWeekday;
+    const originalTotal  = pricePerNight * nights;
+    const discounted     = nights >= 2 ? Math.round(originalTotal * 0.8) : originalTotal;
+
+    cart.push({
+      id:             'cart_' + generateId(),
+      propertyId:     propId,
+      propertyName:   prop.name,
+      station:        prop.station,
+      checkIn:        searchCheckIn,
+      checkOut:       searchCheckOut,
+      guests:         searchGuests,
+      nights,
+      pricePerNight,
+      originalTotal,
+      discountedPrice: discounted,
+    });
+    setCart(cart);
+    updateCartBadge();
+    showToast(`🛒 已加入購物車：${prop.name}`);
+  }
+
+  /* ── 購物車 Badge ── */
+  function updateCartBadge() {
+    const cnt   = cartCount();
+    const badge = document.getElementById('cart-badge');
+    badge.textContent = cnt;
+    cnt > 0 ? badge.classList.add('show') : badge.classList.remove('show');
+  }
+
+  /* ── 開/關 購物車側欄 ── */
+  function openCart() {
+    renderCartPanel();
+    document.getElementById('cart-overlay').classList.add('open');
+    document.getElementById('cart-panel').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeCart() {
+    document.getElementById('cart-overlay').classList.remove('open');
+    document.getElementById('cart-panel').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  /* ── 渲染購物車面板 ── */
+  function renderCartPanel() {
+    const cart   = getCart();
+    const body   = document.getElementById('cart-body');
+    const foot   = document.getElementById('cart-foot');
+
+    if (!cart.length) {
+      body.innerHTML = `
+        <div class="cart-empty">
+          <div class="cart-empty-icon">🛒</div>
+          <p>購物車是空的</p>
+          <p style="font-size:12px;margin-top:4px;color:var(--color-text-light);">搜尋喜歡的房源，加入購物車再結帳</p>
+        </div>`;
+      foot.style.display = 'none';
+      return;
+    }
+
+    // 2晚折扣提示
+    const hasTwo = cart.some(c => c.nights >= 2);
+    const tipHtml = `
+      <div class="cart-discount-tip">
+        <span>🎉</span>
+        <div>${hasTwo
+          ? '<strong>已獲得八折優惠！</strong>訂房滿 2 晚自動享 8 折。'
+          : '訂單滿 <strong>2 晚</strong>即享台鐵八折優惠，並自動發放台鐵八折優惠券！'
+        }</div>
+      </div>`;
+
+    body.innerHTML = tipHtml + cart.map(c => {
+      const saved = c.originalTotal - c.discountedPrice;
+      return `
+        <div class="cart-item">
+          <button class="cart-item-del" onclick="removeFromCart('${escHtml(c.id)}')" aria-label="移除">✕</button>
+          <div class="cart-item-name">${escHtml(c.propertyName)}</div>
+          <div class="cart-item-meta">
+            📅 ${escHtml(c.checkIn)} — ${escHtml(c.checkOut)}（${c.nights} 晚）<br>
+            👥 ${c.guests} 位・📍 ${escHtml(c.station || '')}
+            ${saved > 0 ? `<br><span style="color:var(--color-accent-red);">省了 NT$ ${saved.toLocaleString()}（原 NT$ ${c.originalTotal.toLocaleString()}）</span>` : ''}
+          </div>
+          <div class="cart-item-price">NT$ ${c.discountedPrice.toLocaleString()}</div>
+        </div>`;
+    }).join('');
+
+    // 合計
+    const subtotal   = cart.reduce((s, c) => s + c.originalTotal,   0);
+    const total      = cart.reduce((s, c) => s + c.discountedPrice, 0);
+    const discount   = subtotal - total;
+    document.getElementById('cart-subtotal').textContent  = `NT$ ${subtotal.toLocaleString()}`;
+    document.getElementById('cart-total').textContent     = `NT$ ${total.toLocaleString()}`;
+    const discRow = document.getElementById('cart-discount-row');
+    if (discount > 0) {
+      document.getElementById('cart-discount-val').textContent = `- NT$ ${discount.toLocaleString()}`;
+      discRow.style.display = 'flex';
+    } else {
+      discRow.style.display = 'none';
+    }
+    foot.style.display = '';
+  }
+
+  /* ── 移除購物車項目 ── */
+  function removeFromCart(cartId) {
+    const cart = getCart().filter(c => c.id !== cartId);
+    setCart(cart);
+    updateCartBadge();
+    renderCartPanel();
+  }
+
+  /* ── 價格 Range 即時更新 ── */
+  function onPriceRange() {
+    const val = Number(document.getElementById('f-price').value);
+    document.getElementById('price-display').textContent =
+      val >= 6000 ? 'NT$ 6,000 以下（不限）' : `NT$ ${val.toLocaleString()} 以下`;
+    applyFilters();
+  }
+
+  /* ── 重置篩選 ── */
+  function resetFilters() {
+    document.querySelectorAll('input[name="f-room"]')[0].checked   = true;
+    document.querySelectorAll('input[name="f-dist"]')[0].checked   = true;
+    document.querySelectorAll('input[name="f-rating"]')[0].checked = true;
+    document.querySelectorAll('.filter-check input').forEach(el => el.checked = false);
+    document.getElementById('f-price').value = 6000;
+    document.getElementById('price-display').textContent = 'NT$ 6,000 以下（不限）';
+    applyFilters();
+  }
+
+  init();
+</script>
 </body>
 </html>

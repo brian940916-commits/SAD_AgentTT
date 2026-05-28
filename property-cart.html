@@ -5,16 +5,698 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 結帳</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    .checkout-wrap { padding: var(--space-xl) 0 var(--space-3xl); }
+
+    /* ── 步驟指示器 ── */
+    .stepper-bar {
+      display: flex; align-items: center;
+      margin-bottom: var(--space-2xl);
+    }
+    .step-item { display: flex; align-items: center; flex: 1; }
+    .step-item:last-child { flex: none; }
+    .step-circle {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; flex-shrink: 0;
+      border: 2px solid var(--color-border);
+      background: #fff; color: var(--color-text-light);
+      transition: all .25s;
+    }
+    .step-circle.active  { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .step-circle.done    { background: var(--color-accent-green); border-color: var(--color-accent-green); color: #fff; }
+    .step-label { font-size: 12px; color: var(--color-text-light); margin-top: 4px; white-space: nowrap; }
+    .step-label.active { color: var(--color-primary); font-weight: 600; }
+    .step-label.done   { color: var(--color-accent-green); }
+    .step-inner { display: flex; flex-direction: column; align-items: center; }
+    .step-line { flex: 1; height: 2px; background: var(--color-border-light); margin: 0 4px; margin-bottom: 18px; transition: background .25s; }
+    .step-line.done { background: var(--color-accent-green); }
+
+    /* ── 主內容雙欄 ── */
+    .checkout-grid { display: grid; grid-template-columns: 1fr 320px; gap: var(--space-xl); align-items: start; }
+    .checkout-grid.full { grid-template-columns: 1fr; }
+
+    /* ── 訂單摘要（右欄） ── */
+    .order-summary {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); padding: var(--space-lg);
+      position: sticky; top: calc(60px + 16px);
+    }
+    .summary-head { font-size: 14px; font-weight: 700; color: var(--color-text-main); margin-bottom: var(--space-md); padding-bottom: var(--space-sm); border-bottom: 1px solid var(--color-border-light); }
+    .summary-item { margin-bottom: var(--space-md); padding-bottom: var(--space-md); border-bottom: 1px solid #f0ede5; }
+    .summary-item:last-of-type { border-bottom: none; }
+    .summary-prop-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); margin-bottom: 4px; }
+    .summary-prop-meta { font-size: 12px; color: var(--color-text-sub); line-height: 1.8; }
+    .summary-fee-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-sub); padding: 3px 0; }
+    .summary-fee-row.disc { color: var(--color-accent-red); }
+    .summary-total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; color: var(--color-primary); padding-top: 8px; margin-top: 4px; border-top: 1.5px solid var(--color-border-light); }
+
+    /* ── 卡片區塊 ── */
+    .checkout-card { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--space-lg); margin-bottom: var(--space-md); }
+    .checkout-card-title { font-size: 16px; font-weight: 700; color: var(--color-text-main); margin-bottom: var(--space-md); display: flex; align-items: center; gap: 8px; }
+
+    /* ── 購物車條目（Step 1） ── */
+    .cart-detail-item {
+      display: flex; gap: var(--space-md); padding: var(--space-md) 0;
+      border-bottom: 1px solid #f0ede5;
+    }
+    .cart-detail-item:last-child { border-bottom: none; }
+    .cart-thumb {
+      width: 80px; height: 72px; border-radius: var(--radius-md);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; flex-shrink: 0;
+    }
+    .cart-detail-body { flex: 1; }
+    .cart-item-name { font-size: 15px; font-weight: 600; color: var(--color-text-main); margin-bottom: 4px; }
+    .cart-item-dates { font-size: 13px; color: var(--color-text-sub); margin-bottom: 6px; }
+    .cart-item-prices { display: flex; align-items: baseline; gap: 6px; }
+    .cart-item-final { font-size: 17px; font-weight: 700; color: var(--color-primary); }
+    .cart-item-orig  { font-size: 12px; color: var(--color-text-light); text-decoration: line-through; }
+    .cart-item-disc-tag { font-size: 11px; background: var(--color-danger); color: var(--color-danger-text); padding: 2px 7px; border-radius: var(--radius-sm); font-weight: 600; }
+    .cart-remove-btn { background: none; border: none; font-size: 18px; color: var(--color-text-light); cursor: pointer; padding: 4px; transition: color .15s; }
+    .cart-remove-btn:hover { color: var(--color-accent-red); }
+
+    /* 八折提示 */
+    .discount-notice {
+      background: #FFF8E1; border: 1px solid #F0C040; border-radius: var(--radius-md);
+      padding: 12px var(--space-md); margin-bottom: var(--space-md);
+      display: flex; gap: var(--space-sm); font-size: 13px; color: #7A5A1A;
+    }
+
+    /* ── Step 2 表單 ── */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+    .form-group { margin-bottom: var(--space-md); }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--color-text-sub); margin-bottom: 6px; }
+    .required { color: var(--color-accent-red); }
+    .error-msg { color: var(--color-accent-red); font-size: 12px; margin-top: 4px; display: none; }
+    .error-msg.show { display: block; }
+
+    /* ── Step 3 付款方式 ── */
+    .pay-method-list { display: flex; flex-direction: column; gap: var(--space-sm); margin-bottom: var(--space-lg); }
+    .pay-method-card {
+      border: 2px solid var(--color-border-light); border-radius: var(--radius-lg);
+      padding: var(--space-md); cursor: pointer; transition: all .15s;
+      display: flex; align-items: center; gap: var(--space-md);
+    }
+    .pay-method-card:hover { border-color: var(--color-primary); }
+    .pay-method-card.selected { border-color: var(--color-primary); background: #f8faf8; }
+    .pay-icon { font-size: 28px; flex-shrink: 0; width: 44px; text-align: center; }
+    .pay-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
+    .pay-sub  { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
+    .pay-radio { margin-left: auto; width: 18px; height: 18px; accent-color: var(--color-primary); }
+
+    /* 信用卡表單 */
+    .cc-form { background: #f8faf8; border-radius: var(--radius-md); padding: var(--space-md); margin-top: var(--space-sm); }
+    .cc-form .form-input { background: #fff; }
+    .cc-brand-row { display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+    .cc-brand { font-size: 22px; opacity: .5; cursor: default; }
+    .cc-brand.active { opacity: 1; }
+
+    /* 電子支付 */
+    .epay-btns { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); }
+    .epay-btn  { flex: 1; padding: 10px; border-radius: var(--radius-md); border: 1.5px solid var(--color-border); background: #fff; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; transition: all .15s; font-family: var(--font-main); }
+    .epay-btn:hover { border-color: var(--color-primary); background: #f8faf8; }
+
+    /* 銀行轉帳 */
+    .bank-info { background: #f8faf8; border-radius: var(--radius-md); padding: var(--space-md); margin-top: var(--space-sm); }
+    .bank-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #ede8d8; }
+    .bank-row:last-child { border-bottom: none; }
+    .bank-label { color: var(--color-text-sub); }
+    .bank-val   { font-weight: 600; color: var(--color-text-main); }
+
+    /* 按鈕列 */
+    .btn-row { display: flex; gap: var(--space-sm); justify-content: flex-end; margin-top: var(--space-lg); }
+
+    /* ── Step 4 成功 ── */
+    .success-wrap { text-align: center; padding: var(--space-3xl) var(--space-xl); }
+    .success-icon { font-size: 72px; margin-bottom: var(--space-md); }
+    .success-title { font-size: 26px; font-weight: 700; color: var(--color-primary); margin-bottom: var(--space-sm); }
+    .success-sub   { font-size: 14px; color: var(--color-text-sub); margin-bottom: var(--space-xl); }
+    .order-id-box  { background: var(--color-secondary); border: 1.5px solid var(--color-border); border-radius: var(--radius-lg); display: inline-block; padding: var(--space-md) var(--space-2xl); margin-bottom: var(--space-xl); }
+    .order-id-label { font-size: 11px; color: var(--color-text-light); font-weight: 600; letter-spacing: 1px; }
+    .order-id-val   { font-size: 20px; font-weight: 700; color: var(--color-primary); letter-spacing: 2px; margin-top: 4px; }
+
+    /* 台鐵優惠券通知 */
+    .coupon-notify {
+      background: var(--color-success); border: 1.5px solid #A8D4B8;
+      border-radius: var(--radius-lg); padding: var(--space-lg);
+      max-width: 480px; margin: 0 auto var(--space-xl);
+      display: flex; gap: var(--space-md); align-items: flex-start;
+    }
+    .coupon-notify-icon { font-size: 32px; flex-shrink: 0; }
+    .coupon-notify-title { font-size: 15px; font-weight: 700; color: var(--color-success-text); margin-bottom: 4px; }
+    .coupon-notify-sub   { font-size: 13px; color: var(--color-success-text); opacity: .85; }
+
+    /* 成功訂房清單 */
+    .success-items { max-width: 480px; margin: 0 auto var(--space-xl); text-align: left; }
+    .success-item  { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-md); padding: var(--space-md); margin-bottom: var(--space-sm); display: flex; gap: var(--space-md); align-items: center; }
+    .success-item-icon { font-size: 28px; flex-shrink: 0; }
+    .success-item-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
+    .success-item-meta { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
+
+    /* 空購物車 */
+    .empty-cart { text-align: center; padding: var(--space-3xl); color: var(--color-text-light); }
+    .empty-cart-icon { font-size: 56px; margin-bottom: var(--space-md); }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<div id="app">
+  <div class="checkout-wrap">
+    <div class="page-container">
+
+      <!-- 麵包屑 -->
+      <div class="breadcrumb" style="margin-bottom:var(--space-lg);">
+        <div class="breadcrumb-item"><a href="index.html">首頁</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item"><a href="property-search.html">房源搜尋</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item current">結帳</div>
+      </div>
+
+      <!-- 步驟指示器 -->
+      <div class="stepper-bar" id="stepper"><!-- 動態填入 --></div>
+
+      <!-- 內容區 -->
+      <div id="checkout-content"><!-- 動態填入 --></div>
+
+    </div>
+  </div>
+</div>
+
+<div id="footer-container"></div>
+
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+  renderNav();
+  renderFooter();
+
+  /* ── 頁面保護 ── */
+  const currentUser = getCurrentUser();
+  if (!currentUser) { window.location.href = 'login.html'; }
+
+  /* ── 工具 ── */
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ── 購物車 ── */
+  const CART_KEY = 'agenttt_cart';
+  function getCart()    { try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch { return []; } }
+  function setCart(c)   { localStorage.setItem(CART_KEY, JSON.stringify(c)); }
+  function clearCart()  { localStorage.removeItem(CART_KEY); }
+
+  /* ── 房源展示擴充 ── */
+  const PROP_THUMB = {
+    prop_01: { emoji: '🏡', bg: '#C8E6C9' },
+    prop_02: { emoji: '🌲', bg: '#D7CCC8' },
+    prop_03: { emoji: '🚂', bg: '#FFCDD2' },
+  };
+  function thumb(id) { return PROP_THUMB[id] || { emoji: '🏠', bg: '#f0ede5' }; }
+
+  /* ── 狀態 ── */
+  let currentStep   = 1;
+  let cartItems     = [];
+  let guestInfo     = {};
+  let payMethod     = 'credit';
+  let currentOrderId = '';
+  let couponIssued  = false;
+  let savedBookings = [];
+
+  /* ── 步驟定義 ── */
+  const STEPS = ['確認訂單', '填寫資料', '選擇付款', '訂房完成'];
+
+  /* ── 初始化 ── */
+  function init() {
+    // 讀購物車（可能從 property-detail 直接跳來）
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('direct') === '1') {
+      // direct booking：購物車應已由 property-detail 寫入，直接讀
+    }
+    cartItems = getCart();
+
+    // 預填表單資料
+    guestInfo = {
+      name:  currentUser.name  || '',
+      phone: currentUser.phone || '',
+      email: currentUser.email || '',
+      note:  '',
+    };
+
+    renderStepper();
+    renderStep();
+  }
+
+  /* ── 步驟指示器 ── */
+  function renderStepper() {
+    let html = '';
+    STEPS.forEach((label, i) => {
+      const n = i + 1;
+      const isDone   = n < currentStep;
+      const isActive = n === currentStep;
+      const circleClass = isDone ? 'done' : isActive ? 'active' : '';
+      const labelClass  = isDone ? 'done' : isActive ? 'active' : '';
+      html += `
+        <div class="step-item">
+          <div class="step-inner">
+            <div class="step-circle ${circleClass}">${isDone ? '✓' : n}</div>
+            <div class="step-label ${labelClass}">${escHtml(label)}</div>
+          </div>
+          ${n < STEPS.length ? `<div class="step-line ${isDone ? 'done' : ''}"></div>` : ''}
+        </div>`;
+    });
+    document.getElementById('stepper').innerHTML = html;
+  }
+
+  /* ── 渲染各步驟 ── */
+  function renderStep() {
+    renderStepper();
+    const el = document.getElementById('checkout-content');
+    if      (currentStep === 1) el.innerHTML = renderStep1();
+    else if (currentStep === 2) el.innerHTML = renderStep2();
+    else if (currentStep === 3) el.innerHTML = renderStep3();
+    else if (currentStep === 4) el.innerHTML = renderStep4();
+
+    // 綁定特定事件
+    if (currentStep === 3) initPaymentEvents();
+    window.scrollTo(0, 0);
+  }
+
+  /* ── 計算合計 ── */
+  function calcTotals() {
+    const subtotal  = cartItems.reduce((s, c) => s + c.originalTotal,   0);
+    const total     = cartItems.reduce((s, c) => s + c.discountedPrice, 0);
+    const discount  = subtotal - total;
+    const cleaning  = 200 * cartItems.length;
+    const service   = Math.round(total * 0.05);
+    const grandTotal = total + cleaning + service;
+    return { subtotal, total, discount, cleaning, service, grandTotal };
+  }
+
+  /* ── 右欄訂單摘要 HTML ── */
+  function orderSummaryHtml() {
+    const t = calcTotals();
+    const itemsHtml = cartItems.map(c => `
+      <div class="summary-item">
+        <div class="summary-prop-name">${escHtml(c.propertyName)}</div>
+        <div class="summary-prop-meta">
+          📅 ${escHtml(c.checkIn)} — ${escHtml(c.checkOut)}（${c.nights} 晚）<br>
+          👥 ${c.guests} 人
+        </div>
+        <div style="margin-top:6px;">
+          <div class="summary-fee-row"><span>NT$ ${c.pricePerNight.toLocaleString()} × ${c.nights} 晚</span><span>NT$ ${c.originalTotal.toLocaleString()}</span></div>
+          ${c.nights >= 2 ? `<div class="summary-fee-row disc"><span>8折優惠</span><span>- NT$ ${(c.originalTotal - c.discountedPrice).toLocaleString()}</span></div>` : ''}
+        </div>
+      </div>`).join('');
+
+    return `
+      <div class="order-summary">
+        <div class="summary-head">訂單摘要</div>
+        ${itemsHtml}
+        <div class="summary-fee-row" style="margin-top:8px;"><span>清潔費</span><span>NT$ ${t.cleaning.toLocaleString()}</span></div>
+        <div class="summary-fee-row"><span>服務費（5%）</span><span>NT$ ${t.service.toLocaleString()}</span></div>
+        <div class="summary-total-row"><span>合計</span><span>NT$ ${t.grandTotal.toLocaleString()}</span></div>
+      </div>`;
+  }
+
+  /* ════════════════════════════════
+     STEP 1：確認訂單
+  ════════════════════════════════ */
+  function renderStep1() {
+    if (!cartItems.length) {
+      return `
+        <div class="empty-cart">
+          <div class="empty-cart-icon">🛒</div>
+          <p style="font-size:16px;font-weight:600;margin-bottom:var(--space-sm);">購物車是空的</p>
+          <p style="margin-bottom:var(--space-xl);">請先從房源搜尋頁選擇房源</p>
+          <a href="property-search.html" class="btn btn-primary">前往搜尋房源</a>
+        </div>`;
+    }
+
+    const hasDiscount = cartItems.some(c => c.nights >= 2);
+    const t = calcTotals();
+
+    const itemsHtml = cartItems.map(c => {
+      const th = thumb(c.propertyId);
+      return `
+        <div class="cart-detail-item">
+          <div class="cart-thumb" style="background:${th.bg};">${th.emoji}</div>
+          <div class="cart-detail-body">
+            <div class="cart-item-name">${escHtml(c.propertyName)}</div>
+            <div class="cart-item-dates">📅 ${escHtml(c.checkIn)} — ${escHtml(c.checkOut)}・${c.nights} 晚・👥 ${c.guests} 人</div>
+            <div class="cart-item-prices">
+              <span class="cart-item-final">NT$ ${c.discountedPrice.toLocaleString()}</span>
+              ${c.nights >= 2 ? `<span class="cart-item-orig">NT$ ${c.originalTotal.toLocaleString()}</span><span class="cart-item-disc-tag">8折</span>` : ''}
+            </div>
+          </div>
+          <button class="cart-remove-btn" onclick="removeItem('${escHtml(c.id)}')" title="移除">✕</button>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="checkout-grid">
+        <div>
+          <div class="checkout-card">
+            <div class="checkout-card-title">🏠 訂房項目</div>
+            ${itemsHtml}
+          </div>
+          ${hasDiscount ? `
+            <div class="discount-notice">
+              <span>🎉</span>
+              <div><strong>訂滿2晚享台鐵八折優惠！</strong><br>付款完成後系統將自動發送台鐵八折優惠券到您的帳戶，可於台鐵訂票時折抵使用。</div>
+            </div>` : `
+            <div class="discount-notice" style="background:#f0f8ff;border-color:#90CAF9;color:#1565C0;">
+              <span>💡</span>
+              <div>訂房 <strong>滿 2 晚</strong>即享台鐵八折優惠券！可搭配 Agent TT 台鐵訂票使用。</div>
+            </div>`}
+          <div class="btn-row">
+            <a href="property-search.html" class="btn btn-outline">← 繼續搜尋</a>
+            <button class="btn btn-primary" onclick="nextStep()" ${!cartItems.length ? 'disabled' : ''}>下一步：填寫資料</button>
+          </div>
+        </div>
+        ${orderSummaryHtml()}
+      </div>`;
+  }
+
+  /* ════════════════════════════════
+     STEP 2：填寫資料
+  ════════════════════════════════ */
+  function renderStep2() {
+    return `
+      <div class="checkout-grid">
+        <div>
+          <div class="checkout-card">
+            <div class="checkout-card-title">👤 入住人資料</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">姓名 <span class="required">*</span></label>
+                <input class="form-input" type="text" id="g-name" value="${escHtml(guestInfo.name)}" placeholder="請輸入真實姓名">
+                <div class="error-msg" id="err-name">請輸入姓名</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">手機號碼 <span class="required">*</span></label>
+                <input class="form-input" type="tel" id="g-phone" value="${escHtml(guestInfo.phone)}" placeholder="09XX-XXX-XXX">
+                <div class="error-msg" id="err-phone">請輸入有效手機號碼</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email <span class="required">*</span></label>
+              <input class="form-input" type="email" id="g-email" value="${escHtml(guestInfo.email)}" placeholder="email@example.com">
+              <div class="error-msg" id="err-email">請輸入有效 Email</div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">備註給房東（選填）</label>
+              <textarea class="form-input" id="g-note" rows="3" placeholder="例：預計下午3點入住，請保留停車位">${escHtml(guestInfo.note)}</textarea>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-outline" onclick="prevStep()">← 返回</button>
+            <button class="btn btn-primary" onclick="submitStep2()">下一步：選擇付款</button>
+          </div>
+        </div>
+        ${orderSummaryHtml()}
+      </div>`;
+  }
+
+  /* ════════════════════════════════
+     STEP 3：選擇付款
+  ════════════════════════════════ */
+  function renderStep3() {
+    const t = calcTotals();
+    return `
+      <div class="checkout-grid">
+        <div>
+          <div class="checkout-card">
+            <div class="checkout-card-title">💳 付款方式</div>
+            <div class="pay-method-list">
+              <div class="pay-method-card ${payMethod === 'credit' ? 'selected' : ''}" onclick="selectPay('credit')" role="radio" aria-checked="${payMethod === 'credit'}">
+                <div class="pay-icon">💳</div>
+                <div>
+                  <div class="pay-name">信用卡</div>
+                  <div class="pay-sub">Visa / Mastercard / JCB</div>
+                </div>
+                <input class="pay-radio" type="radio" name="pay" value="credit" ${payMethod === 'credit' ? 'checked' : ''} onclick="selectPay('credit')">
+              </div>
+              <div class="pay-method-card ${payMethod === 'epay' ? 'selected' : ''}" onclick="selectPay('epay')" role="radio" aria-checked="${payMethod === 'epay'}">
+                <div class="pay-icon">📱</div>
+                <div>
+                  <div class="pay-name">電子支付</div>
+                  <div class="pay-sub">LINE Pay / Apple Pay</div>
+                </div>
+                <input class="pay-radio" type="radio" name="pay" value="epay" ${payMethod === 'epay' ? 'checked' : ''} onclick="selectPay('epay')">
+              </div>
+              <div class="pay-method-card ${payMethod === 'bank' ? 'selected' : ''}" onclick="selectPay('bank')" role="radio" aria-checked="${payMethod === 'bank'}">
+                <div class="pay-icon">🏦</div>
+                <div>
+                  <div class="pay-name">銀行轉帳</div>
+                  <div class="pay-sub">台灣銀行 / 玉山銀行 / 國泰世華</div>
+                </div>
+                <input class="pay-radio" type="radio" name="pay" value="bank" ${payMethod === 'bank' ? 'checked' : ''} onclick="selectPay('bank')">
+              </div>
+            </div>
+
+            <!-- 付款細節（動態） -->
+            <div id="pay-detail"><!-- 動態填入 --></div>
+          </div>
+
+          <div class="checkout-card" style="background:var(--color-secondary);">
+            <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--color-primary);">
+              <span>應付合計</span>
+              <span>NT$ ${t.grandTotal.toLocaleString()}</span>
+            </div>
+            <div style="font-size:12px;color:var(--color-text-light);margin-top:4px;">費用包含清潔費 NT$${t.cleaning.toLocaleString()} 及服務費 NT$${t.service.toLocaleString()}</div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-outline" onclick="prevStep()">← 返回</button>
+            <button class="btn btn-primary" onclick="processPayment()" style="min-width:140px;" id="pay-btn">✅ 確認付款</button>
+          </div>
+        </div>
+        ${orderSummaryHtml()}
+      </div>`;
+  }
+
+  /* ── 付款詳情渲染 ── */
+  function renderPayDetail() {
+    const el = document.getElementById('pay-detail');
+    if (!el) return;
+    if (payMethod === 'credit') {
+      el.innerHTML = `
+        <div class="cc-form">
+          <div class="cc-brand-row">
+            <span class="cc-brand active" title="Visa">VISA</span>
+            <span class="cc-brand" title="Mastercard">MC</span>
+            <span class="cc-brand" title="JCB">JCB</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">卡號</label>
+            <input class="form-input" type="text" placeholder="1234 5678 9012 3456" maxlength="19" id="cc-num" oninput="formatCard(this)">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">有效期限</label>
+              <input class="form-input" type="text" placeholder="MM/YY" maxlength="5" oninput="formatExpiry(this)">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label class="form-label">CVV</label>
+              <input class="form-input" type="password" placeholder="•••" maxlength="4">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0;margin-top:var(--space-md);">
+            <label class="form-label">持卡人姓名</label>
+            <input class="form-input" type="text" placeholder="Name on card" value="${escHtml(guestInfo.name.toUpperCase())}">
+          </div>
+        </div>`;
+    } else if (payMethod === 'epay') {
+      el.innerHTML = `
+        <div style="padding:var(--space-sm) 0;">
+          <p style="font-size:13px;color:var(--color-text-sub);margin-bottom:var(--space-md);">請選擇電子支付平台，點擊後將模擬跳轉到支付頁面。</p>
+          <div class="epay-btns">
+            <button class="epay-btn" onclick="simulatePay('LINE Pay')">💚 LINE Pay</button>
+            <button class="epay-btn" onclick="simulatePay('Apple Pay')">🍎 Apple Pay</button>
+          </div>
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <div class="bank-info">
+          <div class="bank-row"><span class="bank-label">銀行</span><span class="bank-val">台灣銀行（004）</span></div>
+          <div class="bank-row"><span class="bank-label">帳號</span><span class="bank-val">004-123456789012</span></div>
+          <div class="bank-row"><span class="bank-label">戶名</span><span class="bank-val">Agent TT 旅遊股份有限公司</span></div>
+          <div class="bank-row"><span class="bank-label">金額</span><span class="bank-val" style="color:var(--color-primary);font-size:16px;" id="bank-amount"></span></div>
+        </div>
+        <p style="font-size:12px;color:var(--color-text-light);margin-top:var(--space-sm);">轉帳完成後請點擊「確認付款」，訂單將於確認入帳後成立。</p>`;
+      setTimeout(() => {
+        const t = calcTotals();
+        const el2 = document.getElementById('bank-amount');
+        if (el2) el2.textContent = `NT$ ${t.grandTotal.toLocaleString()}`;
+      }, 0);
+    }
+  }
+
+  function initPaymentEvents() {
+    renderPayDetail();
+  }
+
+  function selectPay(method) {
+    payMethod = method;
+    document.querySelectorAll('.pay-method-card').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.pay-radio').forEach(el => el.checked = (el.value === method));
+    const cards = document.querySelectorAll('.pay-method-card');
+    const map   = { credit: 0, epay: 1, bank: 2 };
+    if (cards[map[method]]) cards[map[method]].classList.add('selected');
+    renderPayDetail();
+  }
+
+  function formatCard(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 16);
+    el.value = v.match(/.{1,4}/g)?.join(' ') || v;
+  }
+  function formatExpiry(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 4);
+    if (v.length > 2) v = v.slice(0,2) + '/' + v.slice(2);
+    el.value = v;
+  }
+  function simulatePay(name) {
+    alert(`${name} 支付模擬：點擊確認付款以完成訂房（示範用）`);
+  }
+
+  /* ════════════════════════════════
+     STEP 4：訂房完成
+  ════════════════════════════════ */
+  function renderStep4() {
+    const couponHtml = couponIssued ? `
+      <div class="coupon-notify">
+        <div class="coupon-notify-icon">🎫</div>
+        <div>
+          <div class="coupon-notify-title">台鐵八折優惠券已發送！</div>
+          <div class="coupon-notify-sub">恭喜您獲得台鐵車票八折優惠券，有效期限3個月，可於台鐵訂票頁使用。</div>
+        </div>
+      </div>` : '';
+
+    const itemsHtml = savedBookings.map(b => {
+      const th = thumb(b.propertyId);
+      return `
+        <div class="success-item">
+          <div class="success-item-icon" style="width:44px;height:44px;background:${th.bg};border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">${th.emoji}</div>
+          <div>
+            <div class="success-item-name">${escHtml(b.propertyName)}</div>
+            <div class="success-item-meta">📅 ${escHtml(b.checkIn)} — ${escHtml(b.checkOut)}（${b.nights} 晚）・NT$ ${b.totalPrice.toLocaleString()}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="success-wrap">
+        <div class="success-icon">🎉</div>
+        <div class="success-title">訂房成功！</div>
+        <div class="success-sub">感謝您的預訂，確認信已發送至 ${escHtml(guestInfo.email)}</div>
+        <div class="order-id-box">
+          <div class="order-id-label">訂單編號</div>
+          <div class="order-id-val">${escHtml(currentOrderId)}</div>
+        </div>
+        ${couponHtml}
+        <div class="success-items">${itemsHtml}</div>
+        <div style="display:flex;gap:var(--space-md);justify-content:center;flex-wrap:wrap;">
+          <a href="property-orders.html" class="btn btn-primary">查看我的訂單</a>
+          <a href="trip-list.html" class="btn btn-outline">連結到行程</a>
+          <a href="index.html" class="btn btn-ghost">回到首頁</a>
+        </div>
+      </div>`;
+  }
+
+  /* ── 步驟導覽 ── */
+  function nextStep() {
+    if (currentStep < 4) { currentStep++; renderStep(); }
+  }
+  function prevStep() {
+    if (currentStep > 1) { currentStep--; renderStep(); }
+  }
+
+  /* ── Step 2 驗證 ── */
+  function submitStep2() {
+    const name  = document.getElementById('g-name').value.trim();
+    const phone = document.getElementById('g-phone').value.trim();
+    const email = document.getElementById('g-email').value.trim();
+    let ok = true;
+
+    const showErr = (id, show) => {
+      document.getElementById(id).classList.toggle('show', show);
+      if (show) ok = false;
+    };
+    showErr('err-name',  !name);
+    showErr('err-phone', !phone || !/^09/.test(phone));
+    showErr('err-email', !email || !email.includes('@'));
+
+    if (!ok) return;
+    guestInfo = { name, phone, email, note: document.getElementById('g-note').value.trim() };
+    nextStep();
+  }
+
+  /* ── 付款處理 → Step 4 ── */
+  function processPayment() {
+    const btn = document.getElementById('pay-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '處理中…'; }
+
+    setTimeout(() => {
+      // 產生訂單號
+      const now = new Date();
+      const ymd = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+      currentOrderId = `BK-${ymd}-${Math.floor(Math.random()*9000+1000)}`;
+
+      // 儲存訂房
+      savedBookings = [];
+      let hasTwoNights = false;
+      cartItems.forEach(c => {
+        const booking = {
+          id:           generateId(),
+          propertyId:   c.propertyId,
+          propertyName: c.propertyName,
+          checkIn:      c.checkIn,
+          checkOut:     c.checkOut,
+          guests:       c.guests,
+          nights:       c.nights,
+          totalPrice:   c.discountedPrice + 200 + Math.round(c.discountedPrice * 0.05),
+          status:       'paid',
+          guestName:    guestInfo.name,
+          guestPhone:   guestInfo.phone,
+          guestEmail:   guestInfo.email,
+          note:         guestInfo.note || '',
+          linkedTripId: null,
+          userId:       currentUser.id,
+          createdAt:    nowISO(),
+        };
+        saveBooking(booking);
+        savedBookings.push(booking);
+        if (c.nights >= 2) hasTwoNights = true;
+      });
+
+      // 發放台鐵八折優惠券
+      if (hasTwoNights) {
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 3);
+        addCoupon('train_80percent', expiresAt.toISOString());
+        couponIssued = true;
+      }
+
+      // 清空購物車
+      clearCart();
+      cartItems = [];
+
+      currentStep = 4;
+      renderStep();
+    }, 1200);   // 模擬處理延遲
+  }
+
+  /* ── 移除購物車項目 ── */
+  function removeItem(cartId) {
+    cartItems = cartItems.filter(c => c.id !== cartId);
+    setCart(cartItems);
+    renderStep();
+  }
+
+  init();
+</script>
 </body>
 </html>
