@@ -3,18 +3,432 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent TT — 票務管理</title>
+  <title>Agent TT — 我的票券</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    body { background: var(--color-bg); }
+
+    .page-header { padding: var(--space-xl) 0 var(--space-md); border-bottom: 1px solid var(--color-border-light); margin-bottom: var(--space-xl); }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--color-text-main); }
+    .content-area { padding-bottom: var(--space-3xl); }
+
+    /* ── 篩選 Tab ── */
+    .filter-tabs { display: flex; gap: 4px; margin-bottom: var(--space-xl); background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: 4px; width: fit-content; }
+    .filter-tab { padding: 7px 18px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: none; font-family: var(--font-main); color: var(--color-text-sub); transition: all .15s; }
+    .filter-tab.active { background: var(--color-primary); color: #fff; }
+    .filter-tab:hover:not(.active) { background: var(--color-secondary); }
+
+    /* ── 票券卡片 ── */
+    .ticket-card {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 14px;
+      transition: box-shadow .15s;
+    }
+    .ticket-card:hover { box-shadow: var(--shadow-card); }
+
+    /* 車票風格頂部彩帶 */
+    .ticket-card-band {
+      height: 5px;
+    }
+    .band-unused   { background: linear-gradient(90deg, var(--color-primary), #5A9B76); }
+    .band-used     { background: linear-gradient(90deg, #9E9E9E, #BDBDBD); }
+    .band-refunded { background: linear-gradient(90deg, var(--color-accent-red), #E88080); }
+    .band-split    { background: linear-gradient(90deg, #7A9456, #A8C07A); }
+
+    .ticket-card-body {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      padding: 16px 20px;
+    }
+    .ticket-main {}
+    .ticket-route {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .ticket-station { font-size: 20px; font-weight: 700; color: var(--color-text-main); }
+    .ticket-arrow { color: var(--color-text-light); font-size: 16px; }
+    .ticket-via { font-size: 11px; color: var(--color-accent-yellow); background: var(--color-primary); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .ticket-meta { font-size: 13px; color: var(--color-text-sub); line-height: 1.8; }
+    .ticket-meta strong { color: var(--color-text-main); }
+
+    /* 票種標籤 */
+    .ticket-type-tag {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 6px;
+    }
+    .tag-general  { background: var(--color-primary); color: #fff; }
+    .tag-student  { background: #4CAF50; color: #fff; }
+    .tag-senior   { background: #FF9800; color: #fff; }
+    .tag-disabled { background: #9C27B0; color: #fff; }
+    .tag-child    { background: #2196F3; color: #fff; }
+
+    /* 狀態標籤 */
+    .status-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+    .status-unused   { background: var(--color-success); color: var(--color-success-text); }
+    .status-used     { background: #EEEEEE; color: #757575; }
+    .status-refunded { background: var(--color-danger); color: var(--color-danger-text); }
+    .status-split    { background: #E8F4ED; color: #2C6B4A; }
+
+    /* 右側：價格 + 狀態 */
+    .ticket-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .ticket-price { font-size: 20px; font-weight: 700; color: var(--color-accent-red); }
+    .ticket-price small { font-size: 11px; font-weight: 400; color: var(--color-text-light); }
+
+    /* 票券底部操作列 */
+    .ticket-card-foot {
+      padding: 10px 20px;
+      background: var(--color-secondary);
+      border-top: 1px solid var(--color-border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ticket-id-text { font-size: 11px; color: var(--color-text-light); }
+    .ticket-actions { display: flex; gap: 8px; }
+    .act-btn {
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      border: none;
+      transition: all .15s;
+    }
+    .act-btn-primary { background: var(--color-primary); color: #fff; }
+    .act-btn-primary:hover { background: var(--color-primary-dark); }
+    .act-btn-outline { background: #fff; border: 1.5px solid var(--color-border); color: var(--color-text-sub); }
+    .act-btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .act-btn-danger { background: var(--color-danger); color: var(--color-danger-text); border: 1.5px solid #E8A8A5; }
+    .act-btn-danger:hover { background: #F8D0CE; }
+
+    /* ── 空狀態 ── */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--color-text-light); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+
+    /* ── QR Code Modal ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 999; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #fff; border-radius: var(--radius-lg); padding: 32px; width: 380px; max-width: 90vw; text-align: center; }
+    .modal-title { font-size: 17px; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px; }
+    .modal-sub   { font-size: 13px; color: var(--color-text-sub); margin-bottom: 20px; }
+    .qr-area { background: #f5f5f5; border-radius: var(--radius-md); padding: 24px; display: inline-block; margin-bottom: 16px; }
+    .qr-code-text { font-size: 12px; font-family: monospace; color: var(--color-text-sub); word-break: break-all; margin-bottom: 16px; }
+    .modal-close-btn { width: 100%; padding: 10px; background: var(--color-primary); color: #fff; border: none; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; font-family: var(--font-main); cursor: pointer; }
+
+    /* ── 分票 Modal ── */
+    .split-modal-box { background: #fff; border-radius: var(--radius-lg); padding: 28px; width: 420px; max-width: 90vw; }
+    .modal-form-label { font-size: 11px; font-weight: 600; color: var(--color-text-light); letter-spacing: 2px; display: block; margin-bottom: 6px; }
+    .modal-input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); font-size: 14px; font-family: var(--font-main); outline: none; margin-bottom: 12px; }
+    .modal-input:focus { border-color: var(--color-primary); }
+    .modal-btn-row { display: flex; gap: 10px; margin-top: 4px; }
+    .modal-btn-row button { flex: 1; padding: 10px; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; font-family: var(--font-main); cursor: pointer; border: none; }
+    .btn-cancel { background: var(--color-bg); border: 1px solid var(--color-border) !important; color: var(--color-text-sub); }
+    .btn-confirm { background: var(--color-primary); color: #fff; }
+
+    /* 轉乘標籤 */
+    .transfer-tag { font-size: 11px; background: #FFF8E6; color: #7A5A1A; border: 1px solid #E8C547; padding: 2px 8px; border-radius: 20px; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<main>
+  <div class="page-container">
+    <div class="page-header">
+      <h1>🎫 我的票券</h1>
+    </div>
+    <div class="content-area">
+      <!-- 篩選 Tab -->
+      <div class="filter-tabs" role="tablist">
+        <button class="filter-tab active" onclick="setFilter('all',this)" role="tab">全部</button>
+        <button class="filter-tab" onclick="setFilter('unused',this)" role="tab">未使用</button>
+        <button class="filter-tab" onclick="setFilter('used',this)" role="tab">已使用</button>
+        <button class="filter-tab" onclick="setFilter('refunded',this)" role="tab">已退票</button>
+      </div>
+
+      <!-- 票券列表 -->
+      <div id="tickets-list"></div>
+    </div>
+  </div>
+</main>
+
+<!-- ── QR Code Modal ── -->
+<div class="modal-overlay" id="qr-modal" role="dialog" aria-modal="true" aria-label="QR Code">
+  <div class="modal-box">
+    <div class="modal-title">📱 乘車 QR Code</div>
+    <div class="modal-sub" id="qr-route">彰化 → 集集</div>
+    <div class="qr-area">
+      <svg id="qr-svg" width="160" height="160" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="qr-code-text" id="qr-code-text"></div>
+    <div style="font-size:12px;color:var(--color-text-light);margin-bottom:16px;">請於閘口感應 QR Code 進站乘車</div>
+    <button class="modal-close-btn" onclick="closeModal('qr-modal')">關閉</button>
+  </div>
+</div>
+
+<!-- ── 分票 Modal ── -->
+<div class="modal-overlay" id="split-modal" role="dialog" aria-modal="true" aria-label="分票">
+  <div class="split-modal-box">
+    <div class="modal-title" style="margin-bottom:6px;">📤 票券分送</div>
+    <div style="font-size:13px;color:var(--color-text-sub);margin-bottom:20px;line-height:1.7;">
+      將票券分送給其他乘客。分送後本票券狀態將變更為「已分票」，無法再次使用。
+    </div>
+    <label class="modal-form-label">分送方式</label>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button class="act-btn act-btn-outline" style="flex:1;" onclick="setSplitMethod('platform',this)">平台帳號</button>
+      <button class="act-btn act-btn-primary" style="flex:1;" onclick="setSplitMethod('phone',this)">手機號碼</button>
+      <button class="act-btn act-btn-outline" style="flex:1;" onclick="setSplitMethod('email',this)">Email</button>
+    </div>
+    <div id="split-method-label-wrap">
+      <label class="modal-form-label" id="split-method-label">收件人手機號碼</label>
+      <input class="modal-input" id="split-recipient" placeholder="0912345678"/>
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn-cancel" onclick="closeModal('split-modal')">取消</button>
+      <button class="btn-confirm" onclick="confirmSplit()">確認分送</button>
+    </div>
+  </div>
+</div>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let currentFilter = 'all';
+let splitTargetId = null;
+let splitMethod   = 'phone';
+
+const STATUS_LABEL = { unused:'未使用', used:'已使用', refunded:'已退票', split:'已分票' };
+const STATUS_CLASS  = { unused:'status-unused', used:'status-used', refunded:'status-refunded', split:'status-split' };
+const BAND_CLASS    = { unused:'band-unused', used:'band-used', refunded:'band-refunded', split:'band-split' };
+const TYPE_LABEL    = { general:'一般票', student:'學生票', senior:'敬老票', disabled:'愛心票', child:'兒童票' };
+const TYPE_CLASS    = { general:'tag-general', student:'tag-student', senior:'tag-senior', disabled:'tag-disabled', child:'tag-child' };
+
+/* ── 篩選 ── */
+function setFilter(filter, el) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderTickets();
+}
+
+/* ── 渲染票券列表 ── */
+function renderTickets() {
+  const user = getCurrentUser();
+  const container = document.getElementById('tickets-list');
+  if (!user) { container.innerHTML = emptyHTML('請先登入以查看票券'); return; }
+
+  let tickets = getTicketsByUser(user.id);
+  if (currentFilter !== 'all') {
+    tickets = tickets.filter(t => t.status === currentFilter);
+  }
+  // 依建立時間降冪
+  tickets.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  if (!tickets.length) {
+    container.innerHTML = emptyHTML(currentFilter === 'all' ? '尚無票券記錄' : `沒有「${STATUS_LABEL[currentFilter]}」的票券`);
+    return;
+  }
+  container.innerHTML = tickets.map(t => ticketCardHTML(t)).join('');
+}
+
+function ticketCardHTML(t) {
+  const isRefunded = t.status === 'refunded';
+  const isUsed     = t.status === 'used';
+  const isSplit    = t.status === 'split';
+  const isActive   = t.status === 'unused';
+
+  const bandCls   = BAND_CLASS[t.status] || 'band-unused';
+  const statusCls = STATUS_CLASS[t.status] || 'status-unused';
+  const typeCls   = TYPE_CLASS[t.ticketType] || 'tag-general';
+
+  // 動作按鈕
+  let actions = '';
+  if (isActive) {
+    actions += `<button class="act-btn act-btn-primary" onclick="showQR('${escHtml(t.id)}')">顯示 QR Code</button>`;
+    actions += `<button class="act-btn act-btn-outline" onclick="showSplit('${escHtml(t.id)}')">分票</button>`;
+    actions += `<button class="act-btn act-btn-danger" onclick="window.location.href='train-refund.html?ticketId=${escHtml(t.id)}'">退票</button>`;
+  } else if (!isRefunded && !isSplit) {
+    actions += `<button class="act-btn act-btn-outline" onclick="showQR('${escHtml(t.id)}')">查看 QR</button>`;
+  }
+
+  const dateStr = t.date || '—';
+  const fromTo  = `${escHtml(t.fromStation)} → ${escHtml(t.toStation)}`;
+
+  return `
+    <div class="ticket-card" role="article" aria-label="票券 ${escHtml(t.orderId)}">
+      <div class="ticket-card-band ${bandCls}"></div>
+      <div class="ticket-card-body">
+        <div class="ticket-main">
+          <div class="ticket-route">
+            <span class="ticket-station">${escHtml(t.fromStation)}</span>
+            <span class="ticket-arrow">→</span>
+            <span class="ticket-station">${escHtml(t.toStation)}</span>
+            ${t.fromStation !== '二水' && t.toStation !== '二水' && ['集集','水里','車埕','龍泉'].includes(t.toStation) ? '<span class="transfer-tag">經二水轉乘</span>' : ''}
+          </div>
+          <div class="ticket-meta">
+            <span class="ticket-type-tag ${typeCls}">${escHtml(TYPE_LABEL[t.ticketType] || t.ticketType)}</span>
+            <strong>${escHtml(t.passengerName)}</strong>
+            &nbsp;|&nbsp;${escHtml(dateStr)}
+            &nbsp;|&nbsp;${escHtml(t.departTime)} → ${escHtml(t.arriveTime)}
+          </div>
+          <div class="ticket-meta" style="margin-top:2px;">
+            車次 ${escHtml(t.trainNo)} ${escHtml(t.trainType)}
+            ${t.linkedTripId ? `&nbsp;<span style="font-size:11px;background:#E8F4ED;color:#2C6B4A;padding:1px 7px;border-radius:20px;">🗓 已加入行程</span>` : ''}
+          </div>
+        </div>
+        <div class="ticket-right">
+          <div class="ticket-price">NT$${t.price}<br><small>/人</small></div>
+          <span class="status-badge ${statusCls}">${STATUS_LABEL[t.status] || t.status}</span>
+        </div>
+      </div>
+      <div class="ticket-card-foot">
+        <span class="ticket-id-text">訂單 ${escHtml(t.orderId)} ｜ ${escHtml(t.createdAt ? t.createdAt.slice(0,10) : '')} 訂購</span>
+        <div class="ticket-actions">${actions}</div>
+      </div>
+    </div>`;
+}
+
+function emptyHTML(msg) {
+  return `<div class="empty-state"><div class="icon">🎫</div><div style="font-size:15px;font-weight:600;color:#6B6354;margin-bottom:8px;">${escHtml(msg)}</div><div style="font-size:13px;"><a href="train-search.html" style="color:var(--color-primary);">前往查詢車次 →</a></div></div>`;
+}
+
+/* ── QR Code ── */
+function showQR(ticketId) {
+  const ticket = getTicketById(ticketId);
+  if (!ticket) return;
+
+  document.getElementById('qr-route').textContent = `${ticket.fromStation} → ${ticket.toStation}（${ticket.date}）`;
+  document.getElementById('qr-code-text').textContent = ticket.qrCode;
+
+  // SVG QR Code 示意圖
+  const svg = document.getElementById('qr-svg');
+  svg.innerHTML = generateQRSVG(ticket.qrCode);
+
+  document.getElementById('qr-modal').classList.add('open');
+}
+
+function generateQRSVG(code) {
+  // 固定 QR 示意圖（實際專案應使用 qrcode.js）
+  const seed = code.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const size = 14;
+  const cellSize = 10;
+
+  // 使用 seed 產生偽隨機陣列（7×7 定位角落 + 隨機資料）
+  function seededRandom(s) {
+    let x = Math.sin(s + 1) * 10000;
+    return x - Math.floor(x);
+  }
+
+  let rects = '';
+  // 定位角（左上）
+  rects += corner(0, 0);
+  // 定位角（右上）
+  rects += corner(size - 7, 0);
+  // 定位角（左下）
+  rects += corner(0, size - 7);
+
+  // 資料模組（隨機）
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (isCornerZone(r, c, size)) continue;
+      const val = seededRandom(seed + r * size + c);
+      if (val > 0.5) {
+        rects += `<rect x="${c * cellSize}" y="${r * cellSize}" width="${cellSize}" height="${cellSize}" fill="#1A1A1A"/>`;
+      }
+    }
+  }
+  return rects;
+}
+
+function corner(cx, cy) {
+  // 7×7 定位圖案
+  const cs = 10;
+  let s = '';
+  s += `<rect x="${cx*cs}" y="${cy*cs}" width="${7*cs}" height="${7*cs}" fill="#1A1A1A"/>`;
+  s += `<rect x="${(cx+1)*cs}" y="${(cy+1)*cs}" width="${5*cs}" height="${5*cs}" fill="#fff"/>`;
+  s += `<rect x="${(cx+2)*cs}" y="${(cy+2)*cs}" width="${3*cs}" height="${3*cs}" fill="#1A1A1A"/>`;
+  return s;
+}
+
+function isCornerZone(r, c, size) {
+  if (r < 8 && c < 8) return true;
+  if (r < 8 && c >= size - 8) return true;
+  if (r >= size - 8 && c < 8) return true;
+  return false;
+}
+
+/* ── 分票 ── */
+function showSplit(ticketId) {
+  splitTargetId = ticketId;
+  document.getElementById('split-recipient').value = '';
+  setSplitMethod('phone', document.querySelector('#split-modal .act-btn-primary'));
+  document.getElementById('split-modal').classList.add('open');
+}
+
+function setSplitMethod(method, el) {
+  splitMethod = method;
+  document.querySelectorAll('#split-modal .act-btn').forEach(b => {
+    b.className = b.className.replace('act-btn-primary', 'act-btn-outline');
+  });
+  el.className = el.className.replace('act-btn-outline', 'act-btn-primary');
+
+  const labels = { platform: '平台帳號 Email', phone: '收件人手機號碼', email: '收件人 Email' };
+  const placeholders = { platform: 'user@example.com', phone: '0912345678', email: 'user@example.com' };
+  document.getElementById('split-method-label').textContent = labels[method] || '';
+  document.getElementById('split-recipient').placeholder = placeholders[method] || '';
+}
+
+function confirmSplit() {
+  const recipient = document.getElementById('split-recipient').value.trim();
+  if (!recipient) { alert('請填寫收件人資訊'); return; }
+
+  const ticket = getTicketById(splitTargetId);
+  if (!ticket) return;
+
+  ticket.status = 'split';
+  saveTicket(ticket);
+  closeModal('split-modal');
+  renderTickets();
+  alert(`票券已成功分送至 ${recipient}（展示功能）`);
+}
+
+/* ── 關閉 Modal ── */
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => {
+    if (e.target === el) el.classList.remove('open');
+  });
+});
+
+/* ── 初始化 ── */
+(function() {
+  const user = getCurrentUser();
+  if (!user) { window.location.href = 'login.html'; return; }
+  renderNav();
+  renderFooter();
+  renderTickets();
+})();
+</script>
 </body>
 </html>

@@ -283,7 +283,7 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="login-phone">手機號碼</label>
-          <input class="form-input" type="tel" id="login-phone" placeholder="09xx-xxx-xxx"/>
+          <input class="form-input" type="tel" id="login-phone" placeholder="0912345678（09開頭，10碼）"/>
         </div>
         <div class="form-group" id="sms-code-group" style="display:none;">
           <label class="form-label" for="login-sms">驗證碼</label>
@@ -306,7 +306,7 @@
       </div>
       <div class="form-group">
         <label class="form-label" for="reg-phone">手機號碼</label>
-        <input class="form-input" type="tel" id="reg-phone" placeholder="09xx-xxx-xxx" autocomplete="tel"/>
+        <input class="form-input" type="tel" id="reg-phone" placeholder="0912345678（09開頭，10碼）" autocomplete="tel"/>
       </div>
       <div class="form-group">
         <label class="form-label" for="reg-email">Email</label>
@@ -435,12 +435,6 @@ function handleLogin() {
     return;
   }
 
-  // 身份卡片與實際 role 一致性提示（不強制阻擋，以實際 role 為準）
-  if (user.role !== currentRole) {
-    showError('login-error', `此帳號為「${roleName(user.role)}」身份，請切換正確身份後登入`);
-    return;
-  }
-
   setCurrentUser(user);
   showSuccess('login-success', '登入成功，跳轉中…');
   setTimeout(() => redirectByRole(user.role), 600);
@@ -469,6 +463,10 @@ function handleRegister() {
 
   if (!name || !phone || !email || !password) {
     showError('reg-error', '請填寫所有欄位');
+    return;
+  }
+  if (!isValidPhone(phone)) {
+    showError('reg-error', '手機號碼須為 09 開頭共 10 碼');
     return;
   }
   if (password.length < 6) {
@@ -516,10 +514,15 @@ function togglePhoneLogin() {
   clearMessages();
 }
 
+function isValidPhone(phone) {
+  const d = phone.replace(/\D/g, '');
+  return d.length === 10 && d.startsWith('09');
+}
+
 let smsSent = false;
 function handleSendSMS() {
   const phone = document.getElementById('login-phone').value.trim();
-  if (!phone) { showError('phone-error', '請輸入手機號碼'); return; }
+  if (!isValidPhone(phone)) { showError('phone-error', '請輸入有效手機號碼（09 開頭，共 10 碼）'); return; }
 
   if (!smsSent) {
     // 顯示驗證碼欄位

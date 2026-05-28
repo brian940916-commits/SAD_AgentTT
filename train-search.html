@@ -5,16 +5,837 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 車次查詢</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    body { background: var(--color-bg); }
+
+    /* ── Hero 搜尋列 ── */
+    .search-hero {
+      background: linear-gradient(135deg, #2C4A3E 0%, #1A3A2E 100%);
+      padding: 40px 0 0;
+      margin-bottom: 0;
+    }
+    .search-hero-title {
+      text-align: center;
+      color: #FAF6EC;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .search-hero-sub {
+      text-align: center;
+      color: #C5B886;
+      font-size: 13px;
+      letter-spacing: 2px;
+      margin-bottom: 28px;
+    }
+    .search-box {
+      background: #fff;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: 28px 32px 24px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    }
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr 44px 1fr 180px 140px 120px;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 0;
+    }
+    .search-field label {
+      display: block;
+      font-size: 11px;
+      color: var(--color-text-light);
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .search-field select,
+    .search-field input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-family: var(--font-main);
+      color: var(--color-text-main);
+      background: var(--color-bg);
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-field select:focus,
+    .search-field input:focus { border-color: var(--color-primary); }
+    .swap-btn {
+      width: 44px; height: 44px;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      color: var(--color-primary);
+      transition: all .15s;
+      align-self: end;
+      margin-bottom: 0;
+    }
+    .swap-btn:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+    .search-btn {
+      padding: 10px 20px;
+      background: var(--color-accent-red);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      letter-spacing: 1px;
+      align-self: end;
+      transition: background .15s;
+    }
+    .search-btn:hover { background: #B04540; }
+
+    /* ── 進階篩選 ── */
+    .adv-toggle-bar {
+      background: #fff;
+      padding: 12px 32px;
+      border-top: 1px solid var(--color-border-light);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .adv-toggle-btn {
+      font-size: 13px;
+      color: var(--color-text-sub);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      font-family: var(--font-main);
+      padding: 0;
+    }
+    .adv-toggle-btn:hover { color: var(--color-primary); }
+    .adv-panel {
+      background: #F9F7F2;
+      border-top: 1px solid var(--color-border-light);
+      padding: 16px 32px;
+      display: none;
+    }
+    .adv-panel.open { display: block; }
+    .adv-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .adv-group label.group-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text-light);
+      letter-spacing: 2px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--color-text-sub);
+      cursor: pointer;
+    }
+    .check-row input { cursor: pointer; accent-color: var(--color-primary); }
+
+    /* ── 主體 ── */
+    .main-wrap {
+      background: #F2EFE5;
+      min-height: 60vh;
+      padding-bottom: 60px;
+    }
+    .results-wrap {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 28px 32px;
+    }
+
+    /* 轉乘提示橫幅 */
+    .transfer-banner {
+      background: #FFF8E6;
+      border: 1.5px solid #E8C547;
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .transfer-banner-icon { font-size: 20px; line-height: 1; }
+    .transfer-banner-text { font-size: 13px; color: #7A5A1A; line-height: 1.7; }
+    .transfer-banner-text strong { color: #5A3A0A; }
+
+    /* ── 組合卡片 ── */
+    .combo-card {
+      background: #fff;
+      border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 14px;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .combo-card:hover { box-shadow: 0 4px 16px rgba(44,74,62,0.12); border-color: var(--color-border); }
+    .combo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .combo-total-time {
+      font-size: 13px;
+      color: var(--color-text-sub);
+    }
+    .combo-total-price {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-accent-red);
+    }
+    .combo-total-price small { font-size: 12px; font-weight: 400; color: var(--color-text-light); margin-left: 2px; }
+    .leg-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 100px 80px;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-top: 1px dashed var(--color-border-light);
+    }
+    .leg-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .leg-badge.leg1 { background: var(--color-primary); color: #fff; }
+    .leg-badge.leg2 { background: var(--color-accent-yellow); color: var(--color-primary); }
+    .leg-info {}
+    .leg-train-name { font-size: 13px; font-weight: 600; color: var(--color-text-main); }
+    .leg-train-no { font-size: 11px; color: var(--color-text-light); }
+    .leg-times {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .leg-time { font-size: 16px; font-weight: 700; color: var(--color-text-main); }
+    .leg-duration { font-size: 11px; color: var(--color-text-light); }
+    .leg-price { font-size: 14px; font-weight: 600; color: var(--color-primary); text-align: right; }
+    .transfer-connector {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      color: var(--color-text-light);
+      font-size: 12px;
+    }
+    .transfer-connector::before,
+    .transfer-connector::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-border-light);
+    }
+    .select-combo-btn {
+      width: 100%;
+      margin-top: 16px;
+      padding: 11px;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background .15s;
+    }
+    .select-combo-btn:hover { background: var(--color-primary-dark); }
+
+    /* ── 普通班次卡片 ── */
+    .train-card {
+      background: #fff;
+      border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: grid;
+      grid-template-columns: 100px 1fr 120px 100px 120px;
+      gap: 12px;
+      align-items: center;
+      transition: box-shadow .15s;
+    }
+    .train-card:hover { box-shadow: 0 4px 16px rgba(44,74,62,0.1); }
+    .train-type-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .type-express { background: #C4514A; color: #fff; }
+    .type-fast    { background: #2C4A3E; color: #fff; }
+    .type-local   { background: #E8C547; color: #2C4A3E; }
+    .type-pukuai  { background: #7A9456; color: #fff; }
+    .train-no { font-size: 12px; color: var(--color-text-light); margin-top: 4px; }
+    .train-time-col { display: flex; align-items: center; gap: 14px; }
+    .train-time { font-size: 20px; font-weight: 700; color: var(--color-text-main); }
+    .train-arrow { color: var(--color-text-light); font-size: 14px; }
+    .train-duration { font-size: 12px; color: var(--color-text-light); }
+    .train-price-col { font-size: 18px; font-weight: 700; color: var(--color-accent-red); text-align: right; }
+    .train-price-col small { font-size: 11px; font-weight: 400; color: var(--color-text-light); }
+    .book-btn {
+      padding: 9px 16px;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--font-main);
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .book-btn:hover { background: var(--color-primary-dark); }
+
+    /* ── 小站推薦 ── */
+    .station-rec {
+      background: var(--color-primary);
+      color: #FAF6EC;
+      padding: 20px 32px;
+    }
+    .station-rec-title { font-size: 13px; letter-spacing: 2px; opacity: .7; margin-bottom: 12px; }
+    .station-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+    .station-chip {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 6px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .station-chip:hover { background: rgba(255,255,255,0.22); }
+
+    /* ── 結果標題 ── */
+    .results-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-text-main);
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--color-border-light);
+    }
+    .results-count { font-weight: 400; color: var(--color-text-light); font-size: 13px; margin-left: 8px; }
+
+    /* ── 空結果 ── */
+    .no-result {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--color-text-light);
+    }
+    .no-result .no-result-icon { font-size: 48px; margin-bottom: 16px; }
+
+    /* ── 等候提示 ── */
+    .wait-hint {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--color-text-light);
+    }
+    .wait-hint .icon { font-size: 56px; margin-bottom: 16px; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<!-- ── 搜尋區 ── -->
+<div class="search-hero">
+  <div class="search-hero-title">🚂 台鐵車次查詢</div>
+  <div class="search-hero-sub">中彰投小站 × 集集線轉乘</div>
+  <div class="search-box" style="max-width:1000px;margin:0 auto;">
+    <div class="search-row">
+      <div class="search-field">
+        <label for="from-station">出發站</label>
+        <select id="from-station"></select>
+      </div>
+      <button class="swap-btn" onclick="swapStations()" title="互換">⇄</button>
+      <div class="search-field">
+        <label for="to-station">到達站</label>
+        <select id="to-station"></select>
+      </div>
+      <div class="search-field">
+        <label for="travel-date">乘車日期</label>
+        <input type="date" id="travel-date"/>
+      </div>
+      <div class="search-field">
+        <label for="travel-time">出發時間</label>
+        <input type="time" id="travel-time" value="08:00"/>
+      </div>
+      <button class="search-btn" onclick="searchTrains()">查詢車次</button>
+    </div>
+  </div>
+
+  <!-- 進階篩選列 -->
+  <div class="adv-toggle-bar" style="max-width:1000px;margin:0 auto;">
+    <button class="adv-toggle-btn" onclick="toggleAdv()" id="adv-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+      進階篩選
+    </button>
+    <span style="font-size:12px;color:var(--color-text-light);">直達或轉乘、車種、座位偏好</span>
+  </div>
+  <div class="adv-panel" id="adv-panel" style="max-width:1000px;margin:0 auto;">
+    <div class="adv-grid">
+      <div class="adv-group">
+        <label class="group-label">乘車方式</label>
+        <label class="check-row"><input type="checkbox" id="pref-direct" checked> 直達車</label>
+        <label class="check-row"><input type="checkbox" id="pref-transfer" checked> 允許轉乘</label>
+      </div>
+      <div class="adv-group">
+        <label class="group-label">車種偏好</label>
+        <label class="check-row"><input type="checkbox" id="type-taroko" checked> 太魯閣/普悠瑪</label>
+        <label class="check-row"><input type="checkbox" id="type-express" checked> 自強號</label>
+        <label class="check-row"><input type="checkbox" id="type-juguang" checked> 莒光號</label>
+        <label class="check-row"><input type="checkbox" id="type-local" checked> 區間車</label>
+      </div>
+      <div class="adv-group">
+        <label class="group-label">座位偏好</label>
+        <label class="check-row"><input type="checkbox" id="seat-window" checked> 靠窗</label>
+        <label class="check-row"><input type="checkbox" id="seat-aisle"> 靠走道</label>
+        <label class="check-row"><input type="checkbox" id="seat-any" checked> 無偏好</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 結果區 ── -->
+<div class="main-wrap">
+  <div class="results-wrap">
+    <div id="results-area">
+      <div class="wait-hint">
+        <div class="icon">🛤️</div>
+        <div style="font-size:16px;font-weight:600;color:#6B6354;margin-bottom:8px;">請選擇出發站與到達站</div>
+        <div style="font-size:13px;">輸入乘車資訊後點擊「查詢車次」</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 小站推薦 ── -->
+<div class="station-rec">
+  <div style="max-width:1000px;margin:0 auto;">
+    <div class="station-rec-title">🏮 中彰投嚴選小站，搭車直達</div>
+    <div class="station-chips">
+      <div class="station-chip" onclick="quickPick('彰化','集集')">彰化 → 集集 🌾</div>
+      <div class="station-chip" onclick="quickPick('彰化','車埕')">彰化 → 車埕 🪵</div>
+      <div class="station-chip" onclick="quickPick('彰化','水里')">彰化 → 水里 💧</div>
+      <div class="station-chip" onclick="quickPick('台中','集集')">台中 → 集集 🚂</div>
+      <div class="station-chip" onclick="quickPick('員林','集集')">員林 → 集集 🌿</div>
+      <div class="station-chip" onclick="quickPick('二水','車埕')">二水 → 車埕 🎋</div>
+    </div>
+  </div>
+</div>
+
+<div id="footer-container"></div>
+
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+/* ── 車站資料 ── */
+const ALL_STATIONS = [
+  '台中', '新烏日', '豐原', '彰化', '花壇', '大村', '員林', '社頭', '田中', '二水',
+  '集集', '龍泉', '水里', '車埕'
+];
+const JIJI_LINE = ['集集', '龍泉', '水里', '車埕']; // 集集線站點（不含二水）
+
+/* ── 縱貫線車次資料（彰化方向 → 二水）── */
+const WEST_TRAINS = [
+  { trainNo: '4008', type: '區間車', typeKey: 'local',   departH: 6,  departM: 20, durationMin: 32, price: 63 },
+  { trainNo: '4012', type: '區間車', typeKey: 'local',   departH: 7,  departM: 10, durationMin: 32, price: 63 },
+  { trainNo: '109',  type: '自強號', typeKey: 'express', departH: 7,  departM: 45, durationMin: 20, price: 107 },
+  { trainNo: '4016', type: '區間車', typeKey: 'local',   departH: 8,  departM: 5,  durationMin: 32, price: 63 },
+  { trainNo: '1129', type: '莒光號', typeKey: 'juguang', departH: 8,  departM: 40, durationMin: 22, price: 90 },
+  { trainNo: '4020', type: '區間車', typeKey: 'local',   departH: 9,  departM: 15, durationMin: 32, price: 63 },
+  { trainNo: '113',  type: '自強號', typeKey: 'express', departH: 10, departM: 0,  durationMin: 20, price: 107 },
+  { trainNo: '4024', type: '區間車', typeKey: 'local',   departH: 10, departM: 30, durationMin: 32, price: 63 },
+  { trainNo: '1133', type: '莒光號', typeKey: 'juguang', departH: 11, departM: 10, durationMin: 22, price: 90 },
+  { trainNo: '4028', type: '區間車', typeKey: 'local',   departH: 11, departM: 50, durationMin: 32, price: 63 },
+  { trainNo: '4032', type: '區間車', typeKey: 'local',   departH: 13, departM: 5,  durationMin: 32, price: 63 },
+  { trainNo: '1137', type: '莒光號', typeKey: 'juguang', departH: 14, departM: 0,  durationMin: 22, price: 90 },
+  { trainNo: '4036', type: '區間車', typeKey: 'local',   departH: 14, departM: 40, durationMin: 32, price: 63 },
+  { trainNo: '4040', type: '區間車', typeKey: 'local',   departH: 15, departM: 30, durationMin: 32, price: 63 },
+  { trainNo: '1141', type: '莒光號', typeKey: 'juguang', departH: 16, departM: 15, durationMin: 22, price: 90 },
+  { trainNo: '4044', type: '區間車', typeKey: 'local',   departH: 17, departM: 5,  durationMin: 32, price: 63 },
+  { trainNo: '4048', type: '區間車', typeKey: 'local',   departH: 18, departM: 0,  durationMin: 32, price: 63 },
+];
+
+/* ── 集集線車次資料（二水 → 集集/水里/車埕）── */
+const JIJI_TRAINS = [
+  { trainNo: '6281', depart: '06:45', arrive: '07:13', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6283', depart: '08:15', arrive: '08:43', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6285', depart: '09:55', arrive: '10:23', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6287', depart: '11:00', arrive: '11:28', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6289', depart: '13:00', arrive: '13:28', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6291', depart: '14:50', arrive: '15:18', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6293', depart: '16:30', arrive: '16:58', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6295', depart: '18:10', arrive: '18:38', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+  { trainNo: '6297', depart: '20:00', arrive: '20:28', toStation: '車埕', durationMin: 28, price: { '集集':113,'龍泉':113,'水里':113,'車埕':113 } },
+];
+
+/* 直達線路（非集集線）假班次 */
+const DIRECT_TRAINS = [
+  { trainNo: '4002', type: '區間車', typeKey: 'local',   departH: 6,  departM: 0,  durationMin: 40, price: 72 },
+  { trainNo: '106',  type: '自強號', typeKey: 'express', departH: 7,  departM: 0,  durationMin: 25, price: 120 },
+  { trainNo: '4006', type: '區間車', typeKey: 'local',   departH: 7,  departM: 30, durationMin: 40, price: 72 },
+  { trainNo: '1120', type: '莒光號', typeKey: 'juguang', departH: 8,  departM: 10, durationMin: 28, price: 96 },
+  { trainNo: '4010', type: '區間車', typeKey: 'local',   departH: 9,  departM: 0,  durationMin: 40, price: 72 },
+  { trainNo: '110',  type: '自強號', typeKey: 'express', departH: 9,  departM: 30, durationMin: 25, price: 120 },
+  { trainNo: '4014', type: '區間車', typeKey: 'local',   departH: 10, departM: 20, durationMin: 40, price: 72 },
+  { trainNo: '1124', type: '莒光號', typeKey: 'juguang', departH: 11, departM: 0,  durationMin: 28, price: 96 },
+  { trainNo: '4018', type: '區間車', typeKey: 'local',   departH: 12, departM: 0,  durationMin: 40, price: 72 },
+  { trainNo: '114',  type: '自強號', typeKey: 'express', departH: 13, departM: 0,  durationMin: 25, price: 120 },
+  { trainNo: '4022', type: '區間車', typeKey: 'local',   departH: 14, departM: 0,  durationMin: 40, price: 72 },
+  { trainNo: '1128', type: '莒光號', typeKey: 'juguang', departH: 15, departM: 10, durationMin: 28, price: 96 },
+  { trainNo: '4026', type: '區間車', typeKey: 'local',   departH: 16, departM: 30, durationMin: 40, price: 72 },
+  { trainNo: '118',  type: '自強號', typeKey: 'express', departH: 17, departM: 0,  durationMin: 25, price: 120 },
+  { trainNo: '4030', type: '區間車', typeKey: 'local',   departH: 18, departM: 0,  durationMin: 40, price: 72 },
+];
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function fmtTime(h, m) {
+  return `${pad2(h)}:${pad2(m)}`;
+}
+
+function addMinutes(h, m, mins) {
+  const total = h * 60 + m + mins;
+  return { h: Math.floor(total / 60) % 24, m: total % 60 };
+}
+
+function timeToMins(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function isJijiDest(station) {
+  return JIJI_LINE.includes(station);
+}
+
+function typeBadgeHTML(type, key) {
+  const cls = { express:'type-express', juguang:'type-fast', local:'type-local', pukuai:'type-pukuai' }[key] || 'type-local';
+  return `<span class="train-type-badge ${cls}">${escHtml(type)}</span>`;
+}
+
+/* 建立下拉選單 */
+function buildStationSelects() {
+  const fromEl = document.getElementById('from-station');
+  const toEl   = document.getElementById('to-station');
+  ALL_STATIONS.forEach(s => {
+    const o1 = new Option(s, s);
+    const o2 = new Option(s, s);
+    fromEl.appendChild(o1);
+    toEl.appendChild(o2);
+  });
+  fromEl.value = '彰化';
+  toEl.value   = '集集';
+}
+
+/* 設定今日日期 */
+function setDefaultDate() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm   = pad2(today.getMonth() + 1);
+  const dd   = pad2(today.getDate());
+  document.getElementById('travel-date').value = `${yyyy}-${mm}-${dd}`;
+}
+
+function swapStations() {
+  const fromEl = document.getElementById('from-station');
+  const toEl   = document.getElementById('to-station');
+  const tmp = fromEl.value;
+  fromEl.value = toEl.value;
+  toEl.value = tmp;
+}
+
+function toggleAdv() {
+  const panel = document.getElementById('adv-panel');
+  const btn   = document.getElementById('adv-btn');
+  const isOpen = panel.classList.toggle('open');
+  btn.innerHTML = isOpen
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg> 收起篩選`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg> 進階篩選`;
+}
+
+function quickPick(from, to) {
+  document.getElementById('from-station').value = from;
+  document.getElementById('to-station').value   = to;
+  searchTrains();
+}
+
+/* ── 主查詢邏輯 ── */
+function searchTrains() {
+  const from = document.getElementById('from-station').value;
+  const to   = document.getElementById('to-station').value;
+  const date = document.getElementById('travel-date').value;
+  const timeStr = document.getElementById('travel-time').value || '00:00';
+
+  if (!date) {
+    alert('請選擇乘車日期');
+    return;
+  }
+  if (from === to) {
+    alert('出發站與到達站不可相同');
+    return;
+  }
+
+  const afterMins = timeToMins(timeStr);
+  const area = document.getElementById('results-area');
+
+  if (isJijiDest(to)) {
+    renderJijiResults(from, to, date, afterMins, area);
+  } else if (isJijiDest(from)) {
+    renderJijiReverseResults(from, to, date, afterMins, area);
+  } else {
+    renderDirectResults(from, to, date, afterMins, area);
+  }
+}
+
+/* 集集線（正向：一般站 → 集集線）*/
+function renderJijiResults(from, to, date, afterMins, area) {
+  // 如果出發站本身是二水，直接顯示集集線班次
+  if (from === '二水') {
+    const trains = JIJI_TRAINS.filter(t => timeToMins(t.depart) >= afterMins);
+    if (!trains.length) { area.innerHTML = emptyHTML('今日此時段後已無班次'); return; }
+    area.innerHTML = `
+      <div class="results-title">二水 → ${escHtml(to)} 直達車 <span class="results-count">${trains.length} 班</span></div>
+      ${trains.map(t => jijiCardHTML(t, from, to, date)).join('')}`;
+    return;
+  }
+
+  // 需要從縱貫線換集集線
+  const leg1Trains = WEST_TRAINS.filter(t => t.departH * 60 + t.departM >= afterMins);
+  if (!leg1Trains.length) { area.innerHTML = emptyHTML('今日此時段後已無班次'); return; }
+
+  // 產生轉乘組合
+  const combos = [];
+  leg1Trains.forEach(leg1 => {
+    const leg1Arrive = addMinutes(leg1.departH, leg1.departM, leg1.durationMin);
+    const leg1ArriveMin = leg1Arrive.h * 60 + leg1Arrive.m;
+    const leg2 = JIJI_TRAINS.find(t => timeToMins(t.depart) >= leg1ArriveMin + 5);
+    if (leg2) combos.push({ leg1, leg1Arrive, leg2 });
+  });
+
+  if (!combos.length) { area.innerHTML = emptyHTML('今日無合適轉乘組合'); return; }
+
+  const leg1Price = leg1Trains[0].price;
+  const leg2Price = JIJI_TRAINS[0].price[to] || 113;
+  const total = leg1Price + leg2Price; // 但各組合不同票價，以實際計算
+
+  area.innerHTML = `
+    <div class="transfer-banner">
+      <div class="transfer-banner-icon">🔄</div>
+      <div class="transfer-banner-text">
+        <strong>${escHtml(from)} → ${escHtml(to)}</strong> 需在 <strong>二水站</strong> 轉乘集集線。<br>
+        集集線為台鐵支線，不開放對號座預訂，以對號票價計算自由座費用。
+      </div>
+    </div>
+    <div class="results-title">轉乘組合 <span class="results-count">${combos.length} 種</span></div>
+    ${combos.slice(0,6).map(c => comboCardHTML(c, from, to, date)).join('')}`;
+}
+
+/* 集集線（反向：集集線 → 一般站）*/
+function renderJijiReverseResults(from, to, date, afterMins, area) {
+  const trains = JIJI_TRAINS.filter(t => timeToMins(t.depart) >= afterMins);
+  if (!trains.length) { area.innerHTML = emptyHTML('今日此時段後已無班次'); return; }
+  area.innerHTML = `
+    <div class="transfer-banner">
+      <div class="transfer-banner-icon">🔄</div>
+      <div class="transfer-banner-text">
+        <strong>${escHtml(from)}</strong> 搭集集線至 <strong>二水站</strong>，再轉搭縱貫線前往 <strong>${escHtml(to)}</strong>。
+      </div>
+    </div>
+    <div class="results-title">${escHtml(from)} → 二水 <span class="results-count">${trains.length} 班</span></div>
+    ${trains.map(t => jijiCardHTML(t, from, '二水', date)).join('')}`;
+}
+
+/* 普通直達 */
+function renderDirectResults(from, to, date, afterMins, area) {
+  const trains = DIRECT_TRAINS.filter(t => t.departH * 60 + t.departM >= afterMins);
+  if (!trains.length) { area.innerHTML = emptyHTML('今日此時段後已無班次'); return; }
+  area.innerHTML = `
+    <div class="results-title">${escHtml(from)} → ${escHtml(to)} <span class="results-count">${trains.length} 班</span></div>
+    ${trains.slice(0,10).map(t => directCardHTML(t, from, to, date)).join('')}`;
+}
+
+/* ── 卡片 HTML ── */
+function comboCardHTML(combo, from, to, date) {
+  const { leg1, leg1Arrive, leg2 } = combo;
+  const l1Depart = fmtTime(leg1.departH, leg1.departM);
+  const l1Arrive = fmtTime(leg1Arrive.h, leg1Arrive.m);
+  const waitMin  = timeToMins(leg2.depart) - (leg1Arrive.h * 60 + leg1Arrive.m);
+  const totalMin = timeToMins(leg2.arrive) - (leg1.departH * 60 + leg1.departM);
+  const totalH   = Math.floor(totalMin / 60);
+  const totalMR  = totalMin % 60;
+  const totalTime = totalH > 0 ? `${totalH}時${totalMR}分` : `${totalMR}分`;
+  const leg1Price = leg1.price;
+  const leg2Price = JIJI_TRAINS[0].price[to] || 113;
+  const totalPrice = leg1Price + leg2Price;
+
+  const params = new URLSearchParams({
+    from, to, date,
+    via: '二水',
+    trainNo1: leg1.trainNo, depart1: l1Depart, arrive1: l1Arrive, price1: leg1Price,
+    trainType1: leg1.type,
+    trainNo2: leg2.trainNo, depart2: leg2.depart, arrive2: leg2.arrive, price2: leg2Price,
+    trainType2: '普快車',
+    total: totalPrice
+  });
+
+  return `
+    <div class="combo-card">
+      <div class="combo-header">
+        <div>
+          <span style="font-size:14px;font-weight:700;color:var(--color-text-main);">${escHtml(from)} → 二水 → ${escHtml(to)}</span>
+          <span class="combo-total-time" style="margin-left:12px;">全程約 ${escHtml(totalTime)}</span>
+        </div>
+        <div>
+          <div class="combo-total-price">NT$${totalPrice}<small>/人</small></div>
+          <div style="font-size:11px;color:var(--color-text-light);text-align:right;">兩段合計</div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--color-text-light);margin-bottom:4px;padding-top:4px;border-top:1px dashed var(--color-border-light);">
+        第①段　縱貫線　${escHtml(from)} → 二水
+      </div>
+      <div class="leg-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="leg-badge leg1">①</div>
+          <div>
+            <div class="leg-train-name">${escHtml(leg1.type)}</div>
+            <div class="leg-train-no">${escHtml(leg1.trainNo)}</div>
+          </div>
+        </div>
+        <div class="leg-times">
+          <div class="leg-time">${escHtml(l1Depart)}</div>
+          <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          <div class="leg-time">${escHtml(l1Arrive)}</div>
+          <span class="leg-duration">${leg1.durationMin}分</span>
+        </div>
+        <div class="leg-price">NT$${leg1Price}</div>
+      </div>
+
+      <div class="transfer-connector">等候 ${waitMin} 分鐘・二水站換乘集集線</div>
+
+      <div style="font-size:12px;color:var(--color-text-light);margin-bottom:4px;">
+        第②段　集集線　二水 → ${escHtml(to)}
+      </div>
+      <div class="leg-row">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="leg-badge leg2">②</div>
+          <div>
+            <div class="leg-train-name">普快車</div>
+            <div class="leg-train-no">${escHtml(leg2.trainNo)}</div>
+          </div>
+        </div>
+        <div class="leg-times">
+          <div class="leg-time">${escHtml(leg2.depart)}</div>
+          <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          <div class="leg-time">${escHtml(leg2.arrive)}</div>
+          <span class="leg-duration">28分</span>
+        </div>
+        <div class="leg-price">NT$${leg2Price}</div>
+      </div>
+
+      <button class="select-combo-btn" onclick="window.location.href='train-booking.html?${params.toString()}'">
+        選擇此組合 →
+      </button>
+    </div>`;
+}
+
+function jijiCardHTML(t, from, to, date) {
+  const price = typeof t.price === 'object' ? (t.price[to] || 113) : 113;
+  const params = new URLSearchParams({
+    from, to, date,
+    trainNo1: t.trainNo, depart1: t.depart, arrive1: t.arrive, price1: price,
+    trainType1: '普快車', total: price
+  });
+  return `
+    <div class="train-card">
+      <div>
+        <div class="train-type-badge type-pukuai">普快車</div>
+        <div class="train-no">${escHtml(t.trainNo)}</div>
+      </div>
+      <div class="train-time-col">
+        <span class="train-time">${escHtml(t.depart)}</span>
+        <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+        <span class="train-time">${escHtml(t.arrive)}</span>
+      </div>
+      <div class="train-duration">約 28 分</div>
+      <div class="train-price-col">NT$${price}<br><small>/人</small></div>
+      <button class="book-btn" onclick="window.location.href='train-booking.html?${params.toString()}'">訂票</button>
+    </div>`;
+}
+
+function directCardHTML(t, from, to, date) {
+  const arrive = addMinutes(t.departH, t.departM, t.durationMin);
+  const departStr = fmtTime(t.departH, t.departM);
+  const arriveStr = fmtTime(arrive.h, arrive.m);
+  const params = new URLSearchParams({
+    from, to, date,
+    trainNo1: t.trainNo, depart1: departStr, arrive1: arriveStr, price1: t.price,
+    trainType1: t.type, total: t.price
+  });
+  return `
+    <div class="train-card">
+      <div>
+        ${typeBadgeHTML(t.type, t.typeKey)}
+        <div class="train-no">${escHtml(t.trainNo)}</div>
+      </div>
+      <div class="train-time-col">
+        <span class="train-time">${escHtml(departStr)}</span>
+        <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+        <span class="train-time">${escHtml(arriveStr)}</span>
+      </div>
+      <div class="train-duration">約 ${t.durationMin} 分</div>
+      <div class="train-price-col">NT$${t.price}<br><small>/人</small></div>
+      <button class="book-btn" onclick="window.location.href='train-booking.html?${params.toString()}'">訂票</button>
+    </div>`;
+}
+
+function emptyHTML(msg) {
+  return `<div class="no-result"><div class="no-result-icon">🔍</div><div style="font-size:15px;font-weight:600;margin-bottom:8px;">${escHtml(msg)}</div><div style="font-size:13px;">請嘗試更早的出發時間，或選擇其他日期</div></div>`;
+}
+
+/* ── 初始化 ── */
+(function init() {
+  buildStationSelects();
+  setDefaultDate();
+  renderNav();
+  renderFooter();
+
+  // 讀 URL 參數（從首頁快速搜尋跳入）
+  const sp = new URLSearchParams(location.search);
+  if (sp.get('from')) document.getElementById('from-station').value = sp.get('from');
+  if (sp.get('to'))   document.getElementById('to-station').value   = sp.get('to');
+  if (sp.get('date')) document.getElementById('travel-date').value  = sp.get('date');
+  if (sp.get('from') && sp.get('to')) searchTrains();
+})();
+</script>
 </body>
 </html>

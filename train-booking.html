@@ -5,16 +5,637 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 訂票</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    body { background: var(--color-bg); }
+
+    .booking-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 32px 60px;
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 28px;
+      align-items: start;
+    }
+
+    /* ── 行程摘要 ── */
+    .trip-summary {
+      background: var(--color-primary);
+      color: #FAF6EC;
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .trip-summary-title { font-size: 11px; letter-spacing: 2px; opacity:.65; margin-bottom: 10px; }
+    .trip-route { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .leg-pills { display: flex; flex-direction: column; gap: 8px; }
+    .leg-pill {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px;
+    }
+    .leg-pill-left { display: flex; align-items: center; gap: 10px; }
+    .leg-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+    .leg-pill-price { color: #E8C547; font-weight: 600; }
+
+    /* ── Section 卡片 ── */
+    .section-card {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .section-card-title {
+      font-size: 15px; font-weight: 700; color: var(--color-text-main);
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── 票種 ── */
+    .ticket-types-grid {
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 10px;
+    }
+    .ticket-types-grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+    .ticket-type-card {
+      border: 1.5px solid var(--color-border-light); border-radius: var(--radius-md); padding: 12px;
+    }
+    .ticket-type-name { font-size: 13px; font-weight: 700; color: var(--color-text-main); margin-bottom: 2px; }
+    .ticket-type-price { font-size: 16px; font-weight: 700; color: var(--color-accent-red); }
+    .ticket-type-discount { font-size: 11px; color: var(--color-text-light); }
+    .verify-block { border-radius: var(--radius-sm); padding: 6px 10px; margin-top: 6px; font-size: 11px; }
+    .verify-green  { background: #E8F4ED; color: #2C6B4A; border: 1px solid #B8DDCA; }
+    .verify-yellow { background: #FFF8E6; color: #7A5A1A; border: 1px solid #E8C547; }
+    .qty-ctrl { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .qty-btn {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 1.5px solid var(--color-border); background: #fff;
+      font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--color-text-main); transition: all .15s; font-family: var(--font-main);
+    }
+    .qty-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .qty-num { font-size: 16px; font-weight: 700; min-width: 20px; text-align: center; color: var(--color-text-main); }
+    .ticket-subtotal { font-size: 11px; color: var(--color-text-sub); margin-top: 4px; }
+
+    /* ── 乘客表單 ── */
+    .passenger-form { border: 1px solid var(--color-border-light); border-radius: var(--radius-md); overflow: hidden; margin-bottom: 12px; }
+    .passenger-form-header {
+      background: #F9F7F2; padding: 10px 16px;
+      font-size: 13px; font-weight: 600; color: var(--color-text-main);
+      border-bottom: 1px solid var(--color-border-light);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .passenger-type-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .badge-general  { background: var(--color-primary); color: #fff; }
+    .badge-student  { background: #4CAF50; color: #fff; }
+    .badge-senior   { background: #FF9800; color: #fff; }
+    .badge-disabled { background: #9C27B0; color: #fff; }
+    .badge-child    { background: #2196F3; color: #fff; }
+    .passenger-form-body { padding: 16px; }
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+
+    /* ── 取票方式 ── */
+    .pickup-row { display: flex; gap: 10px; }
+    .pickup-card {
+      flex: 1; border: 1.5px solid var(--color-border-light); border-radius: var(--radius-md);
+      padding: 12px; cursor: pointer; text-align: center; transition: all .15s;
+    }
+    .pickup-card.selected { border-color: var(--color-primary); background: #E8F4ED; }
+    .pickup-card-icon { font-size: 22px; margin-bottom: 4px; }
+    .pickup-card-name { font-size: 13px; font-weight: 600; color: var(--color-text-main); }
+    .pickup-card-desc { font-size: 11px; color: var(--color-text-light); margin-top: 2px; }
+
+    /* ── 右側摘要 ── */
+    .order-summary {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); overflow: hidden;
+      position: sticky; top: 24px;
+    }
+    .order-summary-header { background: var(--color-primary); color: #FAF6EC; padding: 14px 18px; font-size: 14px; font-weight: 600; letter-spacing: 1px; }
+    .order-summary-body { padding: 16px 18px; }
+    .summary-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--color-text-sub); margin-bottom: 8px; }
+    .summary-row.total { font-size: 16px; font-weight: 700; color: var(--color-text-main); padding-top: 10px; border-top: 1px solid var(--color-border-light); margin-top: 6px; }
+    .summary-divider { height: 1px; background: var(--color-border-light); margin: 10px 0; }
+
+    .points-box { background: #FFF8E6; border: 1px solid #E8C547; border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px; }
+    .points-box-title { font-size: 12px; font-weight: 600; color: #7A5A1A; margin-bottom: 8px; }
+    .points-input-row { display: flex; align-items: center; gap: 8px; }
+    .points-input { flex: 1; padding: 7px 10px; border: 1px solid #D4C896; border-radius: var(--radius-sm); font-size: 13px; font-family: var(--font-main); background: #fff; color: var(--color-text-main); outline: none; }
+    .use-points-btn { padding: 7px 10px; background: #E8C547; color: var(--color-primary); border: none; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; font-family: var(--font-main); cursor: pointer; white-space: nowrap; }
+
+    .coupon-box { background: #FBEAEA; border: 1px solid #E8A8A5; border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px; }
+    .coupon-box-title { font-size: 12px; font-weight: 600; color: var(--color-accent-red); margin-bottom: 8px; }
+    .coupon-check-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-sub); cursor: pointer; }
+    .coupon-check-row input { accent-color: var(--color-accent-red); cursor: pointer; }
+
+    .pay-btn { width: 100%; padding: 14px; background: var(--color-accent-red); color: #fff; border: none; border-radius: var(--radius-md); font-size: 15px; font-weight: 600; font-family: var(--font-main); cursor: pointer; letter-spacing: 1px; transition: background .15s; margin-top: 4px; }
+    .pay-btn:hover { background: #B04540; }
+    .pay-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* ── 成功畫面 ── */
+    #success-screen { display: none; max-width: 640px; margin: 48px auto; padding: 0 32px 60px; }
+    .success-card { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: 40px 32px; text-align: center; }
+    .success-icon { font-size: 56px; margin-bottom: 16px; }
+    .success-title { font-size: 22px; font-weight: 700; color: var(--color-primary); margin-bottom: 8px; }
+    .success-sub { font-size: 14px; color: var(--color-text-sub); margin-bottom: 24px; }
+    .order-no-box { background: var(--color-bg); border: 1px dashed var(--color-border); border-radius: var(--radius-md); padding: 12px 20px; font-size: 13px; color: var(--color-text-sub); margin-bottom: 16px; }
+    .order-no-box strong { font-size: 16px; color: var(--color-text-main); letter-spacing: 1px; display: block; margin-top: 4px; }
+    .points-earned-box { background: #FFF8E6; border: 1px solid #E8C547; border-radius: var(--radius-md); padding: 10px 16px; font-size: 13px; color: #7A5A1A; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+
+    /* ── Modal ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #fff; border-radius: var(--radius-lg); padding: 28px; width: 440px; max-width: 90vw; }
+    .modal-title { font-size: 17px; font-weight: 700; color: var(--color-text-main); margin-bottom: 8px; }
+    .modal-sub { font-size: 13px; color: var(--color-text-sub); margin-bottom: 18px; line-height: 1.7; }
+    .trip-select { width: 100%; box-sizing: border-box; padding: 10px; border: 1.5px solid var(--color-border); border-radius: var(--radius-md); font-family: var(--font-main); font-size: 14px; margin-bottom: 16px; outline: none; }
+    .modal-btn-row { display: flex; gap: 10px; }
+    .modal-btn-row button { flex: 1; padding: 10px; border-radius: var(--radius-md); font-size: 14px; font-weight: 600; font-family: var(--font-main); cursor: pointer; border: none; }
+    .btn-skip { background: var(--color-bg); border: 1px solid var(--color-border) !important; color: var(--color-text-sub); }
+    .btn-link { background: var(--color-primary); color: #fff; }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<!-- ── 訂票主體 ── -->
+<div id="booking-main">
+  <div style="max-width:1100px;margin:0 auto;padding:24px 32px 0;">
+    <div style="font-size:13px;color:var(--color-text-light);margin-bottom:20px;">
+      <a href="train-search.html" style="color:var(--color-text-sub);text-decoration:none;">車次查詢</a>
+      <span style="margin:0 6px;">›</span>
+      <span style="color:var(--color-text-main);font-weight:600;">確認訂票</span>
+    </div>
+  </div>
+
+  <div class="booking-wrap">
+    <!-- 左欄 -->
+    <div>
+      <!-- 行程摘要 -->
+      <div class="trip-summary">
+        <div class="trip-summary-title">🚂 所選班次</div>
+        <div class="trip-route">
+          <span id="display-from">—</span>
+          <span style="opacity:.6;font-size:16px;">→</span>
+          <span id="display-to">—</span>
+          <span style="font-size:13px;opacity:.6;font-weight:400;" id="display-date"></span>
+        </div>
+        <div class="leg-pills" id="leg-pills"></div>
+      </div>
+
+      <!-- 票種 -->
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          票種與張數
+        </div>
+        <div class="ticket-types-grid" id="ticket-types-top"></div>
+        <div class="ticket-types-grid-2" id="ticket-types-bot"></div>
+      </div>
+
+      <!-- 乘客資料 -->
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a6 6 0 0112 0v2"/></svg>
+          乘客資料
+        </div>
+        <div id="passenger-forms">
+          <div style="font-size:13px;color:var(--color-text-light);text-align:center;padding:20px 0;">請先選擇票種張數</div>
+        </div>
+      </div>
+
+      <!-- 取票方式 -->
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h1v1H9zM14 9h1v1h-1zM9 14h1v1H9z"/></svg>
+          取票方式
+        </div>
+        <div class="pickup-row">
+          <div class="pickup-card selected" onclick="selectPickup('qr',this)">
+            <div class="pickup-card-icon">📱</div>
+            <div class="pickup-card-name">QR Code</div>
+            <div class="pickup-card-desc">App 掃碼乘車</div>
+          </div>
+          <div class="pickup-card" onclick="selectPickup('store',this)">
+            <div class="pickup-card-icon">🏪</div>
+            <div class="pickup-card-name">超商取票</div>
+            <div class="pickup-card-desc">7-11 / 全家</div>
+          </div>
+          <div class="pickup-card" onclick="selectPickup('station',this)">
+            <div class="pickup-card-icon">🏛️</div>
+            <div class="pickup-card-name">車站取票</div>
+            <div class="pickup-card-desc">自動售票機</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右欄：訂單摘要 -->
+    <div>
+      <div class="order-summary">
+        <div class="order-summary-header">📋 訂單摘要</div>
+        <div class="order-summary-body">
+          <div id="price-breakdown"></div>
+          <div class="summary-divider"></div>
+
+          <!-- 點數折抵 -->
+          <div class="points-box">
+            <div class="points-box-title">⭐ 點數折抵 <span id="points-avail" style="font-weight:400;font-size:11px;"></span></div>
+            <div class="points-input-row">
+              <input class="points-input" type="number" id="points-input" min="0" placeholder="折抵點數" oninput="calcTotal()"/>
+              <button class="use-points-btn" onclick="useAllPoints()">全部折抵</button>
+            </div>
+            <div id="points-info" style="font-size:11px;color:#7A5A1A;margin-top:5px;"></div>
+          </div>
+
+          <!-- 優惠券 -->
+          <div id="coupon-area"></div>
+
+          <!-- 合計 -->
+          <div id="summary-rows"></div>
+
+          <button class="pay-btn" id="pay-btn" onclick="handlePay()">前往付款</button>
+          <div style="font-size:11px;color:var(--color-text-light);text-align:center;margin-top:8px;">
+            點擊即代表同意 <a href="#" style="color:var(--color-primary);">乘車規則</a> 與 <a href="#" style="color:var(--color-primary);">退改票規定</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 成功畫面 ── -->
+<div id="success-screen">
+  <div class="success-card">
+    <div class="success-icon">🎉</div>
+    <div class="success-title">訂票成功！</div>
+    <div class="success-sub">您的台鐵車票已完成訂購</div>
+    <div class="order-no-box">
+      訂單編號
+      <strong id="success-order-no">—</strong>
+    </div>
+    <div class="points-earned-box">
+      <span>⭐</span>
+      <span id="points-earned-msg">本次訂票獲得 9 點！</span>
+    </div>
+    <div style="display:flex;gap:12px;">
+      <button onclick="location.href='train-tickets.html'" style="flex:1;padding:12px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;">查看我的票券</button>
+      <button onclick="location.href='train-search.html'" style="flex:1;padding:12px;background:var(--color-bg);border:1.5px solid var(--color-border);color:var(--color-text-sub);border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;">繼續訂票</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 連結行程 Modal ── -->
+<div class="modal-overlay" id="link-trip-modal">
+  <div class="modal-box">
+    <div class="modal-title">🗓️ 加入行程</div>
+    <div class="modal-sub">要將這張票券加入您的行程嗎？<br>方便在行程規劃頁一次管理所有旅遊安排。</div>
+    <select class="trip-select" id="trip-select"></select>
+    <div class="modal-btn-row">
+      <button class="btn-skip" onclick="skipLink()">暫不加入</button>
+      <button class="btn-link" onclick="confirmLink()">加入行程</button>
+    </div>
+  </div>
+</div>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+
+/* ── 票種定義 ── */
+const TICKET_TYPES = [
+  { key:'general',  name:'一般票', ratio:1.00, discount:'',      badgeCls:'badge-general' },
+  { key:'student',  name:'學生票', ratio:0.88, discount:'88折',  badgeCls:'badge-student' },
+  { key:'senior',   name:'敬老票', ratio:0.60, discount:'60折',  badgeCls:'badge-senior' },
+  { key:'disabled', name:'愛心票', ratio:0.60, discount:'60折',  badgeCls:'badge-disabled' },
+  { key:'child',    name:'兒童票', ratio:0.70, discount:'70折',  badgeCls:'badge-child' },
+];
+
+/* ── URL 參數 ── */
+const sp = new URLSearchParams(location.search);
+const P = {
+  from:       sp.get('from')      || '彰化',
+  to:         sp.get('to')        || '集集',
+  date:       sp.get('date')      || '',
+  via:        sp.get('via')       || '',
+  trainNo1:   sp.get('trainNo1')  || '4016',
+  depart1:    sp.get('depart1')   || '08:05',
+  arrive1:    sp.get('arrive1')   || '08:37',
+  price1:     parseInt(sp.get('price1') || '63'),
+  trainType1: sp.get('trainType1') || '區間車',
+  trainNo2:   sp.get('trainNo2')  || '',
+  depart2:    sp.get('depart2')   || '',
+  arrive2:    sp.get('arrive2')   || '',
+  price2:     parseInt(sp.get('price2') || '0'),
+  trainType2: sp.get('trainType2') || '',
+  total:      parseInt(sp.get('total')  || '176'),
+};
+const isTransfer = !!P.via;
+
+/* ── 狀態 ── */
+let qtys = { general:1, student:0, senior:0, disabled:0, child:0 };
+let pickupMethod = 'qr';
+let usedPoints = 0;
+let couponId   = null;
+let lastTicketId = null;
+
+/* ── 行程摘要 ── */
+function renderTripSummary() {
+  document.getElementById('display-from').textContent = P.from;
+  document.getElementById('display-to').textContent   = P.to;
+  document.getElementById('display-date').textContent = P.date ? `（${P.date}）` : '';
+  const pills = document.getElementById('leg-pills');
+  let html = '';
+  if (isTransfer) {
+    html += pillHTML('①', P.trainType1, P.trainNo1, P.from, '二水', P.depart1, P.arrive1, P.price1);
+    html += pillHTML('②', P.trainType2, P.trainNo2, '二水',  P.to,   P.depart2, P.arrive2, P.price2);
+  } else {
+    html += pillHTML('①', P.trainType1, P.trainNo1, P.from, P.to, P.depart1, P.arrive1, P.price1);
+  }
+  pills.innerHTML = html;
+}
+
+function pillHTML(num, type, no, from, to, depart, arrive, price) {
+  return `
+    <div class="leg-pill">
+      <div class="leg-pill-left">
+        <div class="leg-num">${num}</div>
+        <div>
+          <div style="font-weight:600;">${escHtml(depart)} → ${escHtml(arrive)}</div>
+          <div style="font-size:11px;opacity:.7;">${escHtml(type)} ${escHtml(no)} ｜ ${escHtml(from)} → ${escHtml(to)}</div>
+        </div>
+      </div>
+      <div class="leg-pill-price">NT$${price}</div>
+    </div>`;
+}
+
+/* ── 票種卡片 ── */
+function renderTicketTypes() {
+  const top = document.getElementById('ticket-types-top');
+  const bot = document.getElementById('ticket-types-bot');
+  const all = TICKET_TYPES.map(t => {
+    const price = Math.round(P.total * t.ratio);
+    return `
+      <div class="ticket-type-card">
+        <div class="ticket-type-name">${escHtml(t.name)}</div>
+        <div class="ticket-type-price">NT$${price}
+          ${t.discount ? `<span class="ticket-type-discount"> ${escHtml(t.discount)}</span>` : ''}
+        </div>
+        ${extraVerify(t.key)}
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('${t.key}',-1)">−</button>
+          <span class="qty-num" id="qty-${t.key}">${qtys[t.key]}</span>
+          <button class="qty-btn" onclick="changeQty('${t.key}',1)">+</button>
+        </div>
+        <div class="ticket-subtotal" id="sub-${t.key}">小計 NT$${price * qtys[t.key]}</div>
+      </div>`;
+  });
+  top.innerHTML = all.slice(0,3).join('');
+  bot.innerHTML = all.slice(3).join('');
+}
+
+function extraVerify(key) {
+  if (key === 'student')  return `<div class="verify-block verify-green">需出示學生證，購票時填寫學號備查。</div>`;
+  if (key === 'senior')   return `<div class="verify-block verify-yellow">65歲以上，需出示身分證或敬老卡。</div>`;
+  if (key === 'disabled') return `<div class="verify-block verify-yellow">需出示身心障礙手冊（正本）。</div>`;
+  if (key === 'child')    return `<div class="verify-block verify-yellow">未滿12歲，需出示相關證明文件。</div>`;
+  return '';
+}
+
+function changeQty(key, delta) {
+  const v = qtys[key] + delta;
+  if (v < 0 || v > 10) return;
+  qtys[key] = v;
+  document.getElementById(`qty-${key}`).textContent = v;
+  const price = Math.round(P.total * TICKET_TYPES.find(t => t.key === key).ratio);
+  document.getElementById(`sub-${key}`).textContent = `小計 NT$${price * v}`;
+  renderPassengerForms();
+  calcTotal();
+}
+
+/* ── 乘客表單 ── */
+function renderPassengerForms() {
+  const c = document.getElementById('passenger-forms');
+  let html = '', n = 0;
+  TICKET_TYPES.forEach(t => {
+    for (let i = 0; i < qtys[t.key]; i++) {
+      n++;
+      let extra = '';
+      if (t.key === 'student') {
+        extra = `<div class="form-grid-2">
+          <div><label class="form-label">學生證字號</label><input class="form-input" id="p-sid-${t.key}-${i}" placeholder="學號或學生證號"/></div>
+          <div><label class="form-label">就讀學校</label><input class="form-input" id="p-school-${t.key}-${i}" placeholder="國立○○大學"/></div>
+        </div>`;
+      } else if (t.key === 'senior') {
+        extra = `<div class="form-grid-2">
+          <div><label class="form-label">身分證字號</label><input class="form-input" id="p-id-${t.key}-${i}" placeholder="A123456789"/></div>
+          <div><label class="form-label">出生年（民國）</label><input class="form-input" type="number" id="p-birth-${t.key}-${i}" placeholder="51"/></div>
+        </div>`;
+      } else if (t.key === 'disabled') {
+        extra = `<div><label class="form-label">身心障礙手冊號碼</label><input class="form-input" id="p-dis-${t.key}-${i}" placeholder="手冊號碼"/></div>`;
+      } else if (t.key === 'child') {
+        extra = `<div><label class="form-label">出生年份（西元，須未滿12歲）</label><input class="form-input" type="number" id="p-cyear-${t.key}-${i}" placeholder="例：2015"/></div>`;
+      }
+      html += `
+        <div class="passenger-form">
+          <div class="passenger-form-header">
+            乘客 ${n}
+            <span class="passenger-type-badge ${t.badgeCls}">${escHtml(t.name)}</span>
+          </div>
+          <div class="passenger-form-body">
+            <div class="form-grid-2">
+              <div><label class="form-label">姓名</label><input class="form-input" id="p-name-${t.key}-${i}" placeholder="乘客姓名"/></div>
+              <div><label class="form-label">手機號碼</label><input class="form-input" type="tel" id="p-phone-${t.key}-${i}" placeholder="0912345678"/></div>
+            </div>
+            ${extra}
+          </div>
+        </div>`;
+    }
+  });
+  c.innerHTML = n ? html : '<div style="font-size:13px;color:var(--color-text-light);text-align:center;padding:20px 0;">請先選擇票種張數</div>';
+}
+
+/* ── 取票方式 ── */
+function selectPickup(method, el) {
+  pickupMethod = method;
+  document.querySelectorAll('.pickup-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+/* ── 點數與優惠券 ── */
+function initRightSidebar() {
+  const pts = getPoints();
+  document.getElementById('points-avail').textContent = `（可用 ${pts} 點）`;
+
+  const validCoupons = getValidCoupons().filter(c => c.type === 'train_80percent');
+  const couponArea = document.getElementById('coupon-area');
+  if (validCoupons.length) {
+    const c = validCoupons[0];
+    couponId = c.id;
+    couponArea.innerHTML = `
+      <div class="coupon-box">
+        <div class="coupon-box-title">🎟️ 台鐵八折優惠券</div>
+        <label class="coupon-check-row">
+          <input type="checkbox" id="coupon-check" onchange="calcTotal()">
+          使用八折券（${escHtml(c.expiresAt.slice(0,10))} 到期）
+        </label>
+      </div>`;
+  }
+  calcTotal();
+}
+
+function useAllPoints() {
+  document.getElementById('points-input').value = getPoints();
+  calcTotal();
+}
+
+function calcTotal() {
+  let subtotal = 0;
+  TICKET_TYPES.forEach(t => {
+    subtotal += Math.round(P.total * t.ratio) * qtys[t.key];
+  });
+  const totalQty = Object.values(qtys).reduce((a,b) => a+b, 0);
+
+  const pts = parseInt(document.getElementById('points-input').value) || 0;
+  usedPoints = Math.max(0, Math.min(pts, getPoints(), subtotal));
+  if ((parseInt(document.getElementById('points-input').value)||0) !== usedPoints) {
+    document.getElementById('points-input').value = usedPoints;
+  }
+  document.getElementById('points-info').textContent = usedPoints > 0 ? `折抵 NT$${usedPoints}` : '';
+
+  const couponChecked = couponId && document.getElementById('coupon-check') && document.getElementById('coupon-check').checked;
+  const afterCoupon = couponChecked ? Math.round(subtotal * 0.8) : subtotal;
+  const finalTotal  = Math.max(0, afterCoupon - usedPoints);
+
+  let html = '';
+  TICKET_TYPES.filter(t => qtys[t.key] > 0).forEach(t => {
+    const price = Math.round(P.total * t.ratio);
+    html += `<div class="summary-row"><span>${escHtml(t.name)} × ${qtys[t.key]}</span><span>NT$${price * qtys[t.key]}</span></div>`;
+  });
+  if (!totalQty) html = '<div style="font-size:13px;color:var(--color-text-light);">尚未選擇票種</div>';
+  html += `<div class="summary-row" style="margin-top:6px;"><span>票券小計</span><span>NT$${subtotal}</span></div>`;
+  if (couponChecked) html += `<div class="summary-row" style="color:var(--color-accent-red);"><span>🎟️ 八折優惠</span><span>−NT$${subtotal - afterCoupon}</span></div>`;
+  if (usedPoints > 0) html += `<div class="summary-row" style="color:#7A5A1A;"><span>⭐ 點數折抵</span><span>−NT$${usedPoints}</span></div>`;
+  html += `<div class="summary-row total"><span>應付金額</span><span style="color:var(--color-accent-red);">NT$${finalTotal}</span></div>`;
+  document.getElementById('summary-rows').innerHTML = html;
+
+  const btn = document.getElementById('pay-btn');
+  btn.textContent = totalQty > 0 ? `前往付款 NT$${finalTotal}` : '請選擇票種';
+  btn.disabled = totalQty === 0;
+}
+
+/* ── 付款 ── */
+function handlePay() {
+  const user = getCurrentUser();
+  if (!user) { location.href = 'login.html'; return; }
+
+  const totalQty = Object.values(qtys).reduce((a,b) => a+b, 0);
+  if (!totalQty) { alert('請選擇至少一張票'); return; }
+
+  // 驗證乘客
+  let pIdx = 0;
+  for (const t of TICKET_TYPES) {
+    for (let i = 0; i < qtys[t.key]; i++) {
+      pIdx++;
+      const nameEl  = document.getElementById(`p-name-${t.key}-${i}`);
+      const phoneEl = document.getElementById(`p-phone-${t.key}-${i}`);
+      if (!nameEl?.value.trim() || !phoneEl?.value.trim()) {
+        alert(`乘客 ${pIdx} 請填寫姓名與手機號碼`); return;
+      }
+    }
+  }
+
+  // 使用優惠券
+  const couponChecked = couponId && document.getElementById('coupon-check')?.checked;
+  if (couponChecked) useCoupon(couponId);
+  if (usedPoints > 0) usePoints(usedPoints);
+
+  // 產生訂單
+  const now = new Date();
+  const orderId = 'TK-' + now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate()) + '-' + Math.floor(Math.random()*9000+1000);
+
+  const ticketIds = [];
+  TICKET_TYPES.forEach(t => {
+    for (let i = 0; i < qtys[t.key]; i++) {
+      const name  = document.getElementById(`p-name-${t.key}-${i}`)?.value.trim() || '乘客';
+      const phone = document.getElementById(`p-phone-${t.key}-${i}`)?.value.trim() || '';
+      const ticket = {
+        id:            generateId(),
+        orderId,
+        fromStation:   P.from,
+        toStation:     P.to,
+        trainNo:       P.trainNo1,
+        trainType:     P.trainType1,
+        departTime:    P.depart1,
+        arriveTime:    isTransfer ? P.arrive2 : P.arrive1,
+        date:          P.date,
+        ticketType:    t.key,
+        price:         Math.round(P.total * t.ratio),
+        passengerName: name,
+        passengerPhone: phone,
+        status:        'unused',
+        qrCode:        'QR-' + Math.random().toString(36).slice(2,10).toUpperCase(),
+        linkedTripId:  null,
+        userId:        user.id,
+        createdAt:     now.toISOString(),
+      };
+      saveTicket(ticket);
+      ticketIds.push(ticket.id);
+    }
+  });
+
+  lastTicketId = ticketIds[0];
+  addPoints(9, '訂票點數');
+
+  // 顯示成功
+  document.getElementById('booking-main').style.display = 'none';
+  document.getElementById('success-screen').style.display = 'block';
+  document.getElementById('success-order-no').textContent = orderId;
+  document.getElementById('points-earned-msg').textContent = `本次訂票獲得 9 點 Agent TT 點數！（目前共 ${getPoints()} 點）`;
+
+  setTimeout(showLinkTripModal, 700);
+}
+
+/* ── 連結行程 ── */
+function showLinkTripModal() {
+  const user = getCurrentUser();
+  if (!user) return;
+  const trips = getTrips().filter(t => t.ownerId === user.id && t.status !== 'cancelled');
+  if (!trips.length) return;
+  const sel = document.getElementById('trip-select');
+  sel.innerHTML = '<option value="">— 選擇行程 —</option>' +
+    trips.map(t => `<option value="${escHtml(t.id)}">${escHtml(t.name)}</option>`).join('');
+  document.getElementById('link-trip-modal').classList.add('open');
+}
+
+function skipLink() {
+  document.getElementById('link-trip-modal').classList.remove('open');
+}
+
+function confirmLink() {
+  const tripId = document.getElementById('trip-select').value;
+  if (!tripId) { alert('請選擇行程'); return; }
+  if (lastTicketId) linkTicketToTrip(lastTicketId, tripId);
+  document.getElementById('link-trip-modal').classList.remove('open');
+}
+
+/* ── 初始化 ── */
+(function() {
+  renderNav();
+  renderFooter();
+  renderTripSummary();
+  renderTicketTypes();
+  renderPassengerForms();
+  initRightSidebar();
+})();
+</script>
 </body>
 </html>
