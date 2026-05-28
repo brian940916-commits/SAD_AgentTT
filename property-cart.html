@@ -187,6 +187,21 @@
 
 <div id="footer-container"></div>
 
+<!-- ── 連結行程 Modal ── -->
+<div id="link-trip-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;" onclick="if(event.target===this)skipBookingLink()">
+  <div style="background:#fff;border-radius:var(--radius-lg);padding:28px;width:440px;max-width:90vw;">
+    <div style="font-size:17px;font-weight:700;color:var(--color-text-main);margin-bottom:8px;">🗓️ 加入行程</div>
+    <div style="font-size:13px;color:var(--color-text-sub);margin-bottom:18px;line-height:1.7;">
+      要將這次訂房加入您的行程嗎？方便在行程規劃頁統一管理所有安排，並啟用衝突偵測功能。
+    </div>
+    <select id="booking-trip-select" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid var(--color-border);border-radius:var(--radius-md);font-family:var(--font-main);font-size:14px;margin-bottom:16px;outline:none;"></select>
+    <div style="display:flex;gap:10px;">
+      <button onclick="skipBookingLink()" style="flex:1;padding:10px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-bg);border:1px solid var(--color-border);color:var(--color-text-sub);">暫不加入</button>
+      <button onclick="confirmBookingLink()" style="flex:1;padding:10px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-primary);color:#fff;border:none;">加入行程</button>
+    </div>
+  </div>
+</div>
+
 <script src="shared-data.js"></script>
 <script src="shared-nav.js"></script>
 <script>
@@ -600,7 +615,7 @@
         <div class="success-items">${itemsHtml}</div>
         <div style="display:flex;gap:var(--space-md);justify-content:center;flex-wrap:wrap;">
           <a href="property-orders.html" class="btn btn-primary">查看我的訂單</a>
-          <a href="trip-list.html" class="btn btn-outline">連結到行程</a>
+          <button class="btn btn-outline" onclick="showLinkBookingModal()">🗓️ 加入行程</button>
           <a href="index.html" class="btn btn-ghost">回到首頁</a>
         </div>
       </div>`;
@@ -686,6 +701,9 @@
 
       currentStep = 4;
       renderStep();
+
+      // 詢問是否加入行程
+      setTimeout(showLinkBookingModal, 800);
     }, 1200);   // 模擬處理延遲
   }
 
@@ -694,6 +712,32 @@
     cartItems = cartItems.filter(c => c.id !== cartId);
     setCart(cartItems);
     renderStep();
+  }
+
+  /* ── 連結訂房到行程 ── */
+  function showLinkBookingModal() {
+    const trips = getTrips().filter(t => t.ownerId === currentUser.id && t.status !== 'cancelled');
+    const sel   = document.getElementById('booking-trip-select');
+    if (!trips.length) {
+      alert('您目前沒有進行中的行程，請先至「行程規劃」建立行程。');
+      return;
+    }
+    sel.innerHTML = '<option value="">— 選擇行程 —</option>' +
+      trips.map(t => `<option value="${escHtml(t.id)}">${escHtml(t.name)}（${escHtml(t.startDate)} — ${escHtml(t.endDate)}）</option>`).join('');
+    const modal = document.getElementById('link-trip-modal');
+    modal.style.display = 'flex';
+  }
+
+  function skipBookingLink() {
+    document.getElementById('link-trip-modal').style.display = 'none';
+  }
+
+  function confirmBookingLink() {
+    const tripId = document.getElementById('booking-trip-select').value;
+    if (!tripId) { alert('請選擇一個行程'); return; }
+    savedBookings.forEach(b => linkBookingToTrip(b.id, tripId));
+    document.getElementById('link-trip-modal').style.display = 'none';
+    alert(`已成功將 ${savedBookings.length} 筆訂房加入行程！`);
   }
 
   init();
