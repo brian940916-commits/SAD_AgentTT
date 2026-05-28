@@ -5,16 +5,963 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 行程編排</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── 頁首 ── */
+    .edit-header {
+      background: #fff;
+      border-bottom: 1px solid var(--color-border-light);
+      padding: var(--space-md) 0;
+      position: sticky; top: 60px; z-index: 80;
+    }
+    .trip-title-row {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: var(--space-md);
+      flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .trip-main-title { font-size: 20px; font-weight: 700; color: var(--color-text-main); }
+    .trip-meta-row {
+      display: flex; gap: var(--space-lg); flex-wrap: wrap;
+      font-size: 13px; color: var(--color-text-sub);
+    }
+    .trip-meta-item { display: flex; align-items: center; gap: 4px; }
+    .header-actions { display: flex; gap: var(--space-sm); }
+
+    /* ── 衝突橫幅 ── */
+    .conflict-banner {
+      background: var(--color-danger);
+      border-left: 4px solid var(--color-accent-red);
+      color: var(--color-danger-text);
+      padding: 10px var(--space-xl);
+      font-size: 13px;
+      display: none;
+    }
+    .conflict-banner.show { display: flex; align-items: center; gap: var(--space-sm); }
+
+    /* ── Day Tabs ── */
+    .day-tabs-wrap {
+      background: #fff;
+      border-bottom: 2px solid var(--color-border-light);
+      position: sticky; top: calc(60px + 88px); z-index: 75;
+    }
+    .day-tabs-inner {
+      display: flex; align-items: center;
+      gap: 2px; padding: 0 var(--space-xl);
+      overflow-x: auto;
+    }
+    .day-tab {
+      padding: 12px 20px;
+      font-size: 13px; font-weight: 500;
+      color: var(--color-text-sub);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer; white-space: nowrap;
+      transition: color var(--transition), border-color var(--transition);
+      background: none; border-top: none; border-left: none; border-right: none;
+      font-family: var(--font-main);
+      flex-shrink: 0;
+    }
+    .day-tab:hover { color: var(--color-primary); }
+    .day-tab.active {
+      color: var(--color-primary); font-weight: 700;
+      border-bottom-color: var(--color-primary);
+    }
+    .day-tab-add {
+      padding: 8px 14px; font-size: 13px;
+      color: var(--color-text-light);
+      background: none; border: 1.5px dashed var(--color-border);
+      border-radius: var(--radius-md); cursor: pointer;
+      margin-left: 4px; white-space: nowrap; flex-shrink: 0;
+      transition: all var(--transition); font-family: var(--font-main);
+    }
+    .day-tab-add:hover { color: var(--color-primary); border-color: var(--color-primary); }
+
+    /* ── 主內容 ── */
+    .content-area { padding: var(--space-lg) 0 var(--space-3xl); }
+    .content-inner { display: grid; grid-template-columns: 1fr 320px; gap: var(--space-xl); align-items: start; }
+
+    /* ── 整合卡片 ── */
+    .integrated-card {
+      border-radius: var(--radius-md); padding: 12px 16px;
+      margin-bottom: var(--space-sm); border: 1px solid;
+      display: flex; align-items: center; gap: var(--space-md);
+    }
+    .integrated-card.train {
+      background: #E8F4ED; border-color: #A8D4B8; color: var(--color-success-text);
+    }
+    .integrated-card.hotel {
+      background: #F0E5BC; border-color: #D4C070; color: var(--color-warning-text);
+    }
+    .integrated-icon { font-size: 22px; flex-shrink: 0; }
+    .integrated-info { flex: 1; }
+    .integrated-title { font-size: 13px; font-weight: 700; }
+    .integrated-sub   { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+    /* ── 行程項目卡片 ── */
+    .item-card {
+      background: #fff; border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-md); padding: 12px 14px;
+      display: flex; align-items: flex-start; gap: 10px;
+      margin-bottom: var(--space-sm);
+      transition: box-shadow var(--transition), opacity var(--transition);
+    }
+    .item-card.dragging { opacity: 0.4; box-shadow: none; }
+    .item-card.drag-over { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(44,74,62,0.2); }
+    .drag-handle {
+      cursor: grab; color: var(--color-border); font-size: 18px;
+      padding: 2px 0; flex-shrink: 0; line-height: 1;
+      touch-action: none;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .item-emoji { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .item-body  { flex: 1; min-width: 0; }
+    .item-name-row { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: 4px; }
+    .item-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
+    .item-meta { font-size: 12px; color: var(--color-text-light); display: flex; gap: var(--space-md); flex-wrap: wrap; }
+    .item-note { font-size: 12px; color: var(--color-text-sub); margin-top: 4px; }
+    .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .item-action-btn {
+      width: 28px; height: 28px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; cursor: pointer; transition: background var(--transition);
+      background: none; border: none; color: var(--color-text-light);
+    }
+    .item-action-btn:hover { background: #f0ede5; color: var(--color-text-main); }
+    .item-action-btn.danger:hover { background: var(--color-danger); color: var(--color-danger-text); }
+
+    /* 優先順序標籤（可點擊） */
+    .priority-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: var(--radius-xl);
+      cursor: pointer; transition: all var(--transition); font-weight: 500;
+      border: none; font-family: var(--font-main);
+    }
+    .priority-badge.must {
+      background: var(--color-danger); color: var(--color-danger-text);
+    }
+    .priority-badge.candidate {
+      background: #EDEBE4; color: var(--color-text-sub);
+    }
+    .priority-badge:hover { opacity: 0.8; }
+
+    /* ── 新增面板 ── */
+    .add-item-btn {
+      width: 100%; padding: 12px; text-align: center;
+      border: 1.5px dashed var(--color-border); border-radius: var(--radius-md);
+      color: var(--color-text-light); font-size: 14px; cursor: pointer;
+      background: none; transition: all var(--transition); font-family: var(--font-main);
+      margin-top: var(--space-sm);
+    }
+    .add-item-btn:hover { border-color: var(--color-primary); color: var(--color-primary); background: #f8faf8; }
+    .add-item-panel {
+      background: #fff; border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-md); padding: var(--space-md);
+      margin-top: var(--space-sm); display: none;
+    }
+    .add-item-panel.open { display: block; }
+    .type-selector { display: flex; gap: var(--space-sm); margin-bottom: var(--space-md); flex-wrap: wrap; }
+    .type-btn {
+      padding: 6px 14px; border-radius: var(--radius-xl); font-size: 13px;
+      border: 1.5px solid var(--color-border); background: #fff;
+      cursor: pointer; transition: all var(--transition); font-family: var(--font-main);
+    }
+    .type-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+    /* ── 右側摘要欄 ── */
+    .summary-card { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--space-md); margin-bottom: var(--space-md); }
+    .summary-title { font-size: 13px; font-weight: 600; color: var(--color-text-sub); letter-spacing: 1px; margin-bottom: var(--space-sm); }
+
+    /* ── Empty state ── */
+    .day-empty { text-align: center; padding: var(--space-2xl) var(--space-lg); color: var(--color-text-light); }
+    .day-empty-icon { font-size: 36px; margin-bottom: var(--space-sm); }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<!-- 衝突橫幅 -->
+<div class="conflict-banner" id="conflict-banner" role="alert">
+  <span>⚠️</span>
+  <span id="conflict-msg"></span>
+</div>
+
+<div id="app">
+
+  <!-- 頁首 -->
+  <div class="edit-header">
+    <div class="page-container">
+      <div class="breadcrumb" style="margin-bottom:8px;">
+        <div class="breadcrumb-item"><a href="trip-list.html">我的行程</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item current" id="trip-breadcrumb-name">行程編排</div>
+      </div>
+      <div class="trip-title-row">
+        <h1 class="trip-main-title" id="trip-title">載入中…</h1>
+        <div class="header-actions">
+          <a id="btn-collab"   href="#" class="btn btn-outline btn-sm">👥 協作</a>
+          <a id="btn-expense"  href="#" class="btn btn-outline btn-sm">💰 費用</a>
+          <button class="btn btn-ghost btn-sm" onclick="copyShareLink()">🔗 分享</button>
+        </div>
+      </div>
+      <div class="trip-meta-row" id="trip-meta-row">
+        <!-- 動態填入 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Tabs -->
+  <div class="day-tabs-wrap">
+    <div class="day-tabs-inner" id="day-tabs" role="tablist">
+      <!-- 動態產生 -->
+    </div>
+  </div>
+
+  <!-- 主內容 -->
+  <div class="content-area">
+    <div class="page-container">
+      <div class="content-inner">
+
+        <!-- 左：行程項目 -->
+        <div>
+          <div id="day-date-label" style="font-size:13px;color:var(--color-text-sub);margin-bottom:var(--space-md);"></div>
+
+          <!-- 整合卡片區 -->
+          <div id="integrated-cards"></div>
+
+          <!-- 行程項目列表 -->
+          <div id="items-list"
+               ondragover="event.preventDefault()"
+               ondrop="onDropZone(event)">
+          </div>
+
+          <!-- 新增面板 -->
+          <button class="add-item-btn" id="add-item-btn" onclick="toggleAddPanel()">
+            ＋ 新增景點 / 餐廳 / 活動
+          </button>
+          <div class="add-item-panel" id="add-item-panel">
+            <div class="type-selector" role="group" aria-label="項目類型">
+              <button class="type-btn active" data-type="attraction" onclick="setNewItemType('attraction')">🏛 景點</button>
+              <button class="type-btn"        data-type="restaurant" onclick="setNewItemType('restaurant')">🍽 餐廳</button>
+              <button class="type-btn"        data-type="activity"   onclick="setNewItemType('activity')">🎯 活動</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-sm);margin-bottom:var(--space-sm);">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">開始時間</label>
+                <input class="form-input" type="time" id="new-item-start" style="padding:8px 10px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">結束時間</label>
+                <input class="form-input" type="time" id="new-item-end" style="padding:8px 10px;"/>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:var(--space-sm);">
+              <label class="form-label">名稱 <span style="color:var(--color-accent-red)">*</span></label>
+              <input class="form-input" type="text" id="new-item-name" placeholder="景點/餐廳/活動名稱" style="padding:8px 10px;"/>
+            </div>
+            <div class="form-group" style="margin-bottom:var(--space-sm);">
+              <label class="form-label">備註</label>
+              <input class="form-input" type="text" id="new-item-note" placeholder="備註（選填）" style="padding:8px 10px;"/>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);">
+              <div style="display:flex;gap:var(--space-sm);align-items:center;">
+                <span style="font-size:13px;color:var(--color-text-sub);">優先順序：</span>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+                  <input type="radio" name="new-priority" value="must"      style="accent-color:var(--color-accent-red);"> 必去
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+                  <input type="radio" name="new-priority" value="candidate" style="accent-color:var(--color-primary);" checked> 候選
+                </label>
+              </div>
+              <div style="display:flex;gap:var(--space-sm);">
+                <button class="btn btn-ghost btn-sm" onclick="closeAddPanel()">取消</button>
+                <button class="btn btn-primary btn-sm" onclick="addItem()">新增</button>
+              </div>
+            </div>
+            <div class="error-msg" id="add-item-error" style="margin-top:var(--space-sm);"></div>
+          </div>
+        </div>
+
+        <!-- 右：摘要 -->
+        <div>
+          <div class="summary-card">
+            <div class="summary-title">行程摘要</div>
+            <div id="summary-content" style="font-size:13px;color:var(--color-text-sub);line-height:2;"></div>
+          </div>
+          <div class="summary-card" id="expense-summary-card" style="display:none;">
+            <div class="summary-title">費用概覽</div>
+            <div id="expense-summary" style="font-size:13px;color:var(--color-text-sub);line-height:2;"></div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-title">快速操作</div>
+            <div style="display:flex;flex-direction:column;gap:var(--space-sm);">
+              <a id="quick-train"   href="train-search.html"  class="btn btn-outline btn-sm btn-full">🚂 查詢/訂購台鐵票</a>
+              <a id="quick-hotel"   href="property-search.html" class="btn btn-outline btn-sm btn-full">🏨 搜尋周邊住宿</a>
+              <a id="quick-collab"  href="#"                  class="btn btn-outline btn-sm btn-full">👥 邀請旅伴協作</a>
+              <a id="quick-expense" href="#"                  class="btn btn-outline btn-sm btn-full">💰 查看費用分帳</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- end #app -->
+
+<!-- ══════════════════════════════════════════════
+     編輯項目 Modal
+══════════════════════════════════════════════ -->
+<div class="modal-backdrop hidden" id="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="edit-modal-title">編輯項目</h2>
+      <button class="modal-close" onclick="closeEditModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-item-id"/>
+      <div class="type-selector" role="group" aria-label="項目類型">
+        <button class="type-btn" data-type="attraction" onclick="setEditType('attraction')">🏛 景點</button>
+        <button class="type-btn" data-type="restaurant" onclick="setEditType('restaurant')">🍽 餐廳</button>
+        <button class="type-btn" data-type="activity"   onclick="setEditType('activity')">🎯 活動</button>
+        <button class="type-btn" data-type="hotel"      onclick="setEditType('hotel')">🏨 住宿</button>
+        <button class="type-btn" data-type="train"      onclick="setEditType('train')">🚂 交通</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">名稱 <span style="color:var(--color-accent-red)">*</span></label>
+        <input class="form-input" type="text" id="edit-item-name"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);">
+        <div class="form-group">
+          <label class="form-label">開始時間</label>
+          <input class="form-input" type="time" id="edit-item-start"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">結束時間</label>
+          <input class="form-input" type="time" id="edit-item-end"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">備註</label>
+        <input class="form-input" type="text" id="edit-item-note" placeholder="備註（選填）"/>
+      </div>
+      <div style="display:flex;gap:var(--space-lg);align-items:center;">
+        <span style="font-size:13px;color:var(--color-text-sub);">優先順序：</span>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+          <input type="radio" name="edit-priority" value="must"      style="accent-color:var(--color-accent-red);"> 必去
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
+          <input type="radio" name="edit-priority" value="candidate" style="accent-color:var(--color-primary);"> 候選
+        </label>
+      </div>
+      <div class="error-msg" id="edit-item-error" style="margin-top:var(--space-sm);"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeEditModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveEditItem()">儲存變更</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container" id="toast-container"></div>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+/* ══════════════════════════════════════════════
+   頁面保護 & 初始化資料
+══════════════════════════════════════════════ */
+const currentUser = getCurrentUser();
+if (!currentUser) window.location.href = 'login.html';
+
+const urlParams = new URLSearchParams(window.location.search);
+const tripId    = urlParams.get('id') || '';
+let   tripData  = tripId ? getTripById(tripId) : null;
+
+if (!tripData) {
+  alert('找不到行程，請重新選擇。');
+  window.location.href = 'trip-list.html';
+}
+
+let currentDay     = 1;
+let newItemType    = 'attraction';
+let dragSrcId      = null;
+
+/* ══════════════════════════════════════════════
+   工具函式
+══════════════════════════════════════════════ */
+function getDayCount(trip) {
+  const s = new Date(trip.startDate + 'T00:00:00');
+  const e = new Date(trip.endDate   + 'T00:00:00');
+  return Math.max(1, Math.round((e - s) / 86400000) + 1);
+}
+
+function getDateForDay(day) {
+  const d = new Date(tripData.startDate + 'T00:00:00');
+  d.setDate(d.getDate() + day - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return `${d.getMonth()+1}/${d.getDate()}（${['日','一','二','三','四','五','六'][d.getDay()]}）`;
+}
+
+function timeToMin(hhmm) {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+const ITEM_EMOJI = {
+  attraction: '🏛', restaurant: '🍽', activity: '🎯',
+  hotel: '🏨', train: '🚂', shopping: '🛍', nature: '🌿',
+};
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ══════════════════════════════════════════════
+   衝突偵測
+══════════════════════════════════════════════ */
+function checkConflicts() {
+  const tickets  = getTickets().filter(t => t.linkedTripId === tripId);
+  const bookings = getBookings().filter(b => b.linkedTripId === tripId);
+  const conflicts = [];
+
+  for (const tk of tickets) {
+    if (!tk.arriveTime || !tk.date) continue;
+    const arriveMin = timeToMin(tk.arriveTime) + 30; // +30 分鐘緩衝
+
+    for (const bk of bookings) {
+      if (bk.checkIn !== tk.date) continue;
+      const checkInTime = '15:00'; // 預設 check-in 15:00
+      const checkInMin  = timeToMin(checkInTime);
+
+      if (arriveMin > checkInMin) {
+        conflicts.push({
+          train:   `${tk.fromStation}→${tk.toStation} 抵達 ${tk.arriveTime}`,
+          hotel:   bk.propertyName,
+          date:    fmtDate(tk.date),
+          arrive:  tk.arriveTime,
+        });
+      }
+    }
+  }
+
+  const banner  = document.getElementById('conflict-banner');
+  const msgEl   = document.getElementById('conflict-msg');
+  if (conflicts.length > 0) {
+    const c = conflicts[0];
+    msgEl.textContent =
+      `⚠ 時間衝突：${c.date} 列車 ${c.train}，` +
+      `抵達後僅剩不到 30 分鐘即需 Check-in「${c.hotel}」（15:00），建議提前確認。`;
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+/* ══════════════════════════════════════════════
+   頁首渲染
+══════════════════════════════════════════════ */
+function renderHeader() {
+  const t = tripData;
+  document.title = `Agent TT — ${t.name}`;
+  document.getElementById('trip-breadcrumb-name').textContent = t.name;
+  document.getElementById('trip-title').textContent           = t.name;
+
+  document.getElementById('btn-collab').href   = `trip-collab.html?id=${tripId}`;
+  document.getElementById('btn-expense').href  = `trip-expense.html?id=${tripId}`;
+  document.getElementById('quick-collab').href = `trip-collab.html?id=${tripId}`;
+  document.getElementById('quick-expense').href= `trip-expense.html?id=${tripId}`;
+
+  const days     = getDayCount(t);
+  const members  = (t.members || []).length;
+  const statusMap= { planning:'規劃中', completed:'已完成', cancelled:'已取消' };
+
+  document.getElementById('trip-meta-row').innerHTML = `
+    <span class="trip-meta-item">📍 ${escHtml(t.station || '未設定')}</span>
+    <span class="trip-meta-item">📅 ${t.startDate} — ${t.endDate}（${days} 天）</span>
+    <span class="trip-meta-item">👥 ${members} 人</span>
+    <span class="trip-meta-item">
+      <span class="badge ${t.status==='planning'?'badge-warning':t.status==='completed'?'badge-success':'badge-neutral'}">
+        ${statusMap[t.status] || '規劃中'}
+      </span>
+    </span>`;
+
+  /* 摘要欄 */
+  const totalExp = (t.expenses||[]).reduce((s,e)=>s+e.amount,0);
+  document.getElementById('summary-content').innerHTML = `
+    <div>📍 ${escHtml(t.station||'未設定')}</div>
+    <div>🗓 ${days} 天 ${(t.members||[]).length} 人</div>
+    <div>🏷 項目數：${(t.items||[]).length} 個</div>
+    <div>🎫 已訂票：${(t.tickets||[]).length} 張</div>
+    <div>🏨 已訂房：${(t.bookings||[]).length} 筆</div>`;
+
+  if (totalExp > 0 || t.budget) {
+    document.getElementById('expense-summary-card').style.display = 'block';
+    document.getElementById('expense-summary').innerHTML = `
+      <div>💰 已花費：NT$ ${totalExp.toLocaleString()}</div>
+      ${t.budget ? `<div>📊 預算：NT$ ${Number(t.budget).toLocaleString()}</div>` : ''}`;
+  }
+}
+
+/* ══════════════════════════════════════════════
+   Day Tabs
+══════════════════════════════════════════════ */
+function renderDayTabs() {
+  const days  = getDayCount(tripData);
+  const tabEl = document.getElementById('day-tabs');
+
+  let html = '';
+  for (let i = 1; i <= days; i++) {
+    const dateStr = fmtDate(getDateForDay(i));
+    html += `
+      <button class="day-tab${i === currentDay ? ' active' : ''}"
+              role="tab" aria-selected="${i===currentDay}"
+              onclick="switchDay(${i})">
+        Day ${i} <span style="font-weight:400;opacity:0.7;font-size:11px;margin-left:4px;">${dateStr}</span>
+      </button>`;
+  }
+  html += `<button class="day-tab-add" onclick="addDay()" title="新增天數">＋ 新增天</button>`;
+  tabEl.innerHTML = html;
+}
+
+function switchDay(day) {
+  currentDay = day;
+  renderDayTabs();
+  renderDayContent(day);
+  closeAddPanel();
+}
+
+function addDay() {
+  // 延長 endDate 一天
+  const end = new Date(tripData.endDate + 'T00:00:00');
+  end.setDate(end.getDate() + 1);
+  tripData.endDate = end.toISOString().slice(0, 10);
+  addLog('延長行程', `新增 Day ${getDayCount(tripData)}（${tripData.endDate}）`);
+  saveTrip(tripData);
+  renderHeader();
+  renderDayTabs();
+  switchDay(getDayCount(tripData));
+  showToast('已新增一天', 'success');
+}
+
+/* ══════════════════════════════════════════════
+   整合卡片（票券 & 住宿）
+══════════════════════════════════════════════ */
+function renderIntegratedCards(day) {
+  const dayDate   = getDateForDay(day);
+  const tickets   = getTickets().filter(t => t.linkedTripId === tripId && t.date === dayDate && t.status !== 'refunded');
+  const bookings  = getBookings().filter(b => b.linkedTripId === tripId && b.checkIn === dayDate);
+  const container = document.getElementById('integrated-cards');
+
+  let html = '';
+
+  /* 台鐵整合卡 */
+  if (tickets.length > 0) {
+    const grp = {}; // 按 orderId 分組
+    tickets.forEach(tk => {
+      if (!grp[tk.orderId]) grp[tk.orderId] = [];
+      grp[tk.orderId].push(tk);
+    });
+    for (const ord of Object.values(grp)) {
+      const first = ord[0]; const last = ord[ord.length-1];
+      const route = ord.map(t => t.toStation).join(' → ');
+      html += `
+        <div class="integrated-card train">
+          <div class="integrated-icon">🚂</div>
+          <div class="integrated-info">
+            <div class="integrated-title">
+              ${escHtml(first.fromStation)} → ${escHtml(last.toStation)}
+              ${ord.length > 1 ? `<span style="font-weight:400;font-size:11px;opacity:0.7;">（轉乘：${escHtml(route)}）</span>` : ''}
+            </div>
+            <div class="integrated-sub">
+              出發 ${first.departTime || '--:--'} ／ 抵達 ${last.arriveTime || '--:--'}
+              ／ ${ord.map(t=>t.trainNo+'('+t.trainType+')').join(' + ')}
+            </div>
+          </div>
+          <span class="badge badge-success" style="flex-shrink:0;">已訂票</span>
+        </div>`;
+    }
+  }
+
+  /* 住宿整合卡 */
+  bookings.forEach(bk => {
+    html += `
+      <div class="integrated-card hotel">
+        <div class="integrated-icon">🏨</div>
+        <div class="integrated-info">
+          <div class="integrated-title">${escHtml(bk.propertyName)} Check-in</div>
+          <div class="integrated-sub">
+            入住 ${bk.checkIn} → 退房 ${bk.checkOut}（${bk.nights} 晚）
+          </div>
+        </div>
+        <span class="badge badge-warning" style="flex-shrink:0;">已訂房</span>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════
+   行程項目列表
+══════════════════════════════════════════════ */
+function renderDayContent(day) {
+  const dateStr = fmtDate(getDateForDay(day));
+  document.getElementById('day-date-label').textContent = `Day ${day}　${getDateForDay(day)} ${dateStr}`;
+
+  renderIntegratedCards(day);
+
+  const items   = (tripData.items || [])
+    .filter(i => i.day === day)
+    .sort((a, b) => a.order - b.order);
+  const listEl  = document.getElementById('items-list');
+
+  if (items.length === 0) {
+    listEl.innerHTML = `
+      <div class="day-empty">
+        <div class="day-empty-icon">📋</div>
+        <div style="font-size:14px;font-weight:600;color:var(--color-text-sub);">今天還沒有行程</div>
+        <div style="font-size:13px;margin-top:4px;">點擊下方按鈕新增第一個景點</div>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map(item => itemCardHTML(item)).join('');
+  bindDragEvents();
+}
+
+function itemCardHTML(item) {
+  const emoji    = ITEM_EMOJI[item.type] || '📌';
+  const priCls   = item.priority === 'must' ? 'must' : 'candidate';
+  const priLabel = item.priority === 'must' ? '必去' : '候選';
+  const hasLink  = item.linkedTicketId || item.linkedBookingId;
+
+  const timePart = item.time
+    ? `<span>🕐 ${item.time}${item.endTime ? ' — ' + item.endTime : ''}</span>`
+    : '';
+  const notePart = item.note
+    ? `<div class="item-note" title="${escHtml(item.note)}">📝 ${escHtml(item.note.slice(0,60))}${item.note.length>60?'…':''}</div>`
+    : '';
+  const linkBadge = hasLink
+    ? `<span class="badge badge-success" style="font-size:10px;padding:1px 6px;">已整合</span>`
+    : '';
+
+  return `
+    <div class="item-card" id="item-${item.id}"
+         draggable="true"
+         ondragstart="onDragStart(event,'${item.id}')"
+         ondragover="onDragOver(event,'${item.id}')"
+         ondrop="onDrop(event,'${item.id}')"
+         ondragend="onDragEnd(event)">
+
+      <div class="drag-handle" title="拖曳排序">⠿</div>
+      <div class="item-emoji">${emoji}</div>
+
+      <div class="item-body">
+        <div class="item-name-row">
+          <span class="item-name">${escHtml(item.name)}</span>
+          <button class="priority-badge ${priCls}"
+                  onclick="togglePriority('${item.id}')"
+                  title="點擊切換優先順序">${priLabel}</button>
+          ${linkBadge}
+        </div>
+        <div class="item-meta">${timePart}</div>
+        ${notePart}
+      </div>
+
+      <div class="item-actions">
+        <button class="item-action-btn" onclick="openEditModal('${item.id}')" title="編輯">✏️</button>
+        <button class="item-action-btn danger" onclick="deleteItem('${item.id}')" title="刪除">🗑</button>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════════
+   拖曳排序
+══════════════════════════════════════════════ */
+function bindDragEvents() {
+  // 事件已透過 inline handler 綁定，這裡無需額外操作
+}
+
+function onDragStart(e, itemId) {
+  dragSrcId = itemId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', itemId);
+  setTimeout(() => {
+    const el = document.getElementById('item-' + itemId);
+    if (el) el.classList.add('dragging');
+  }, 0);
+}
+
+function onDragOver(e, targetId) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.item-card').forEach(c => c.classList.remove('drag-over'));
+  if (targetId !== dragSrcId) {
+    const el = document.getElementById('item-' + targetId);
+    if (el) el.classList.add('drag-over');
+  }
+}
+
+function onDrop(e, targetId) {
+  e.stopPropagation();
+  e.preventDefault();
+  if (!dragSrcId || dragSrcId === targetId) return;
+
+  const dayItems = (tripData.items || [])
+    .filter(i => i.day === currentDay)
+    .sort((a,b) => a.order - b.order);
+
+  const srcIdx = dayItems.findIndex(i => i.id === dragSrcId);
+  const tgtIdx = dayItems.findIndex(i => i.id === targetId);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+
+  const [moved] = dayItems.splice(srcIdx, 1);
+  dayItems.splice(tgtIdx, 0, moved);
+
+  // 重新指派 order
+  dayItems.forEach((item, idx) => {
+    const orig = tripData.items.find(i => i.id === item.id);
+    if (orig) orig.order = idx + 1;
+  });
+
+  saveTrip(tripData);
+  renderDayContent(currentDay);
+}
+
+function onDropZone(e) {
+  e.preventDefault();
+}
+
+function onDragEnd(e) {
+  document.querySelectorAll('.item-card').forEach(c => {
+    c.classList.remove('dragging', 'drag-over');
+  });
+  dragSrcId = null;
+}
+
+/* ══════════════════════════════════════════════
+   優先順序切換
+══════════════════════════════════════════════ */
+function togglePriority(itemId) {
+  const item = (tripData.items || []).find(i => i.id === itemId);
+  if (!item) return;
+  item.priority = item.priority === 'must' ? 'candidate' : 'must';
+  addLog('修改項目', `將「${item.name}」優先順序改為「${item.priority === 'must' ? '必去' : '候選'}」`);
+  saveTrip(tripData);
+  renderDayContent(currentDay);
+}
+
+/* ══════════════════════════════════════════════
+   新增項目
+══════════════════════════════════════════════ */
+function toggleAddPanel() {
+  const panel = document.getElementById('add-item-panel');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) closeAddPanel();
+  else {
+    panel.classList.add('open');
+    document.getElementById('add-item-btn').style.display = 'none';
+    document.getElementById('new-item-name').focus();
+  }
+}
+function closeAddPanel() {
+  document.getElementById('add-item-panel').classList.remove('open');
+  document.getElementById('add-item-btn').style.display = '';
+  document.getElementById('new-item-name').value = '';
+  document.getElementById('new-item-note').value = '';
+  document.getElementById('new-item-start').value = '';
+  document.getElementById('new-item-end').value   = '';
+  document.querySelector('[name="new-priority"][value="candidate"]').checked = true;
+  hideAddError();
+}
+
+function setNewItemType(type) {
+  newItemType = type;
+  document.querySelectorAll('#add-item-panel .type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+}
+
+function addItem() {
+  const name  = document.getElementById('new-item-name').value.trim();
+  if (!name) { showAddError('請輸入名稱'); return; }
+
+  const start    = document.getElementById('new-item-start').value;
+  const end      = document.getElementById('new-item-end').value;
+  const note     = document.getElementById('new-item-note').value.trim();
+  const priority = document.querySelector('[name="new-priority"]:checked')?.value || 'candidate';
+
+  const dayItems = (tripData.items||[]).filter(i => i.day === currentDay);
+  const maxOrder = dayItems.reduce((m, i) => Math.max(m, i.order), 0);
+
+  const newItem = {
+    id:              generateId(),
+    tripId,
+    day:             currentDay,
+    type:            newItemType,
+    name,
+    time:            start,
+    endTime:         end,
+    note,
+    priority,
+    order:           maxOrder + 1,
+    linkedTicketId:  null,
+    linkedBookingId: null,
+  };
+
+  tripData.items = [...(tripData.items||[]), newItem];
+  addLog('新增項目', `在 Day ${currentDay} 新增「${name}」`);
+  saveTrip(tripData);
+  closeAddPanel();
+  renderDayContent(currentDay);
+  showToast(`已新增「${name}」`, 'success');
+}
+
+function showAddError(msg) {
+  const el = document.getElementById('add-item-error');
+  el.textContent = '⚠ ' + msg; el.style.display = 'block';
+}
+function hideAddError() {
+  const el = document.getElementById('add-item-error');
+  el.textContent = ''; el.style.display = 'none';
+}
+
+/* ══════════════════════════════════════════════
+   編輯項目 Modal
+══════════════════════════════════════════════ */
+function openEditModal(itemId) {
+  const item = (tripData.items||[]).find(i => i.id === itemId);
+  if (!item) return;
+
+  document.getElementById('edit-item-id').value     = itemId;
+  document.getElementById('edit-item-name').value   = item.name;
+  document.getElementById('edit-item-start').value  = item.time    || '';
+  document.getElementById('edit-item-end').value    = item.endTime || '';
+  document.getElementById('edit-item-note').value   = item.note    || '';
+
+  const priInput = document.querySelector(`[name="edit-priority"][value="${item.priority||'candidate'}"]`);
+  if (priInput) priInput.checked = true;
+
+  setEditType(item.type || 'attraction');
+  document.getElementById('edit-item-error').style.display = 'none';
+  document.getElementById('edit-modal').classList.remove('hidden');
+  document.getElementById('edit-item-name').focus();
+}
+
+function setEditType(type) {
+  document.querySelectorAll('#edit-modal .type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.add('hidden');
+}
+
+function saveEditItem() {
+  const itemId  = document.getElementById('edit-item-id').value;
+  const name    = document.getElementById('edit-item-name').value.trim();
+  if (!name) {
+    const err = document.getElementById('edit-item-error');
+    err.textContent = '⚠ 請輸入名稱'; err.style.display = 'block';
+    return;
+  }
+  const type     = document.querySelector('#edit-modal .type-btn.active')?.dataset.type || 'attraction';
+  const start    = document.getElementById('edit-item-start').value;
+  const end      = document.getElementById('edit-item-end').value;
+  const note     = document.getElementById('edit-item-note').value.trim();
+  const priority = document.querySelector('[name="edit-priority"]:checked')?.value || 'candidate';
+
+  const item = (tripData.items||[]).find(i => i.id === itemId);
+  if (!item) return;
+
+  Object.assign(item, { name, type, time: start, endTime: end, note, priority });
+  addLog('編輯項目', `修改了「${name}」的資訊`);
+  saveTrip(tripData);
+  closeEditModal();
+  renderDayContent(currentDay);
+  showToast('已更新', 'success');
+}
+
+/* ══════════════════════════════════════════════
+   刪除項目
+══════════════════════════════════════════════ */
+function deleteItem(itemId) {
+  const item = (tripData.items||[]).find(i => i.id === itemId);
+  if (!item) return;
+  if (!confirm(`確定刪除「${item.name}」？`)) return;
+  tripData.items = tripData.items.filter(i => i.id !== itemId);
+  addLog('刪除項目', `刪除了「${item.name}」`);
+  saveTrip(tripData);
+  renderDayContent(currentDay);
+  showToast(`已刪除「${item.name}」`, 'error');
+}
+
+/* ══════════════════════════════════════════════
+   分享連結
+══════════════════════════════════════════════ */
+function copyShareLink() {
+  const url = `${location.origin}${location.pathname.replace('trip-edit.html','trip-readonly.html')}?id=${tripId}`;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('已複製唯讀連結！', 'success');
+  }).catch(() => {
+    prompt('複製以下連結：', url);
+  });
+}
+
+/* ══════════════════════════════════════════════
+   操作紀錄
+══════════════════════════════════════════════ */
+function addLog(action, detail) {
+  tripData.logs = tripData.logs || [];
+  tripData.logs.push({
+    id:        generateId(),
+    userId:    currentUser.id,
+    userName:  currentUser.name,
+    action,
+    detail,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/* ══════════════════════════════════════════════
+   鍵盤快捷鍵
+══════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeEditModal();
+    closeAddPanel();
+  }
+});
+
+/* ══════════════════════════════════════════════
+   Toast
+══════════════════════════════════════════════ */
+function showToast(msg, type='') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+/* ══════════════════════════════════════════════
+   初始化
+══════════════════════════════════════════════ */
+renderNav();
+renderFooter();
+renderHeader();
+renderDayTabs();
+renderDayContent(currentDay);
+checkConflicts();
+</script>
 </body>
 </html>
