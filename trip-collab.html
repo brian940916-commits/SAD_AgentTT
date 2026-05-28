@@ -3,18 +3,819 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent TT — 協作</title>
+  <title>Agent TT — 行程協作</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── 頁首 ── */
+    .collab-header {
+      background: #fff;
+      border-bottom: 1px solid var(--color-border-light);
+      padding: var(--space-md) 0 0;
+      position: sticky; top: 60px; z-index: 80;
+    }
+    .content-area { padding: var(--space-xl) 0 var(--space-3xl); }
+
+    /* ── 成員卡片 ── */
+    .member-card {
+      display: flex; align-items: center; gap: var(--space-md);
+      padding: var(--space-md);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      background: #fff;
+      margin-bottom: var(--space-sm);
+    }
+    .member-avatar {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: var(--color-primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; flex-shrink: 0;
+    }
+    .member-avatar.host-color  { background: var(--color-accent-green); }
+    .member-avatar.guest-color { background: var(--color-accent-red); }
+    .member-info { flex: 1; min-width: 0; }
+    .member-name  { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
+    .member-email { font-size: 12px; color: var(--color-text-light); margin-top: 2px; }
+    .member-joined{ font-size: 11px; color: var(--color-text-light); margin-top: 2px; }
+
+    /* ── 留言區 ── */
+    .chat-wrap {
+      display: flex; flex-direction: column;
+      height: calc(100vh - 320px); min-height: 340px;
+    }
+    .chat-list {
+      flex: 1; overflow-y: auto;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+      padding: var(--space-md);
+      display: flex; flex-direction: column; gap: var(--space-sm);
+      background: var(--color-secondary);
+    }
+    .chat-bubble-row { display: flex; gap: 10px; align-items: flex-end; }
+    .chat-bubble-row.mine { flex-direction: row-reverse; }
+    .chat-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--color-primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .chat-bubble {
+      max-width: 68%; padding: 9px 14px;
+      border-radius: 16px; font-size: 13px; line-height: 1.55;
+    }
+    .chat-bubble.other { background: #fff; color: var(--color-text-main); border-bottom-left-radius: 4px; }
+    .chat-bubble.mine  { background: var(--color-primary); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-meta { font-size: 11px; color: var(--color-text-light); margin-top: 3px; }
+    .chat-meta.mine { text-align: right; }
+
+    .chat-input-row {
+      display: flex; gap: var(--space-sm);
+      border: 1px solid var(--color-border-light);
+      border-top: none;
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      padding: var(--space-sm);
+      background: #fff;
+    }
+    .chat-input {
+      flex: 1; border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-xl); padding: 8px 16px;
+      font-size: 13px; font-family: var(--font-main); resize: none;
+      outline: none; transition: border-color var(--transition);
+    }
+    .chat-input:focus { border-color: var(--color-primary); }
+
+    /* ── 投票 ── */
+    .vote-card {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-md);
+    }
+    .vote-title { font-size: 15px; font-weight: 700; color: var(--color-text-main); margin-bottom: var(--space-md); }
+    .vote-option {
+      margin-bottom: var(--space-sm);
+    }
+    .vote-option-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .vote-option-label { font-size: 13px; font-weight: 500; color: var(--color-text-main); }
+    .vote-option-count { font-size: 12px; color: var(--color-text-light); }
+    .vote-progress-bg {
+      height: 8px; background: var(--color-border-light);
+      border-radius: 99px; overflow: hidden; margin-bottom: 4px;
+    }
+    .vote-progress-fill {
+      height: 100%; background: var(--color-primary);
+      border-radius: 99px; transition: width 0.4s ease;
+    }
+    .vote-voters { font-size: 11px; color: var(--color-text-light); }
+    .vote-btn {
+      padding: 6px 16px; border-radius: var(--radius-xl);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1.5px solid var(--color-primary);
+      background: #fff; color: var(--color-primary);
+      transition: all var(--transition); font-family: var(--font-main);
+    }
+    .vote-btn.voted {
+      background: var(--color-primary); color: #fff;
+    }
+    .vote-btn:hover:not(.voted) { background: var(--color-secondary); }
+    .vote-footer {
+      margin-top: var(--space-md); padding-top: var(--space-sm);
+      border-top: 1px solid var(--color-border-light);
+      font-size: 12px; color: var(--color-text-light);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .voted-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 99px;
+      background: var(--color-success); color: var(--color-success-text);
+    }
+    .not-voted-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 99px;
+      background: #EDEBE4; color: var(--color-text-sub);
+    }
+
+    /* 建立投票表單 */
+    .create-vote-panel {
+      background: var(--color-secondary);
+      border: 1.5px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-md);
+      display: none;
+    }
+    .create-vote-panel.open { display: block; }
+    .option-row {
+      display: flex; gap: var(--space-sm); align-items: center;
+      margin-bottom: var(--space-sm);
+    }
+    .option-row input { flex: 1; }
+
+    /* ── 操作紀錄 ── */
+    .log-item {
+      display: flex; gap: var(--space-md); align-items: flex-start;
+      padding: var(--space-sm) 0;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+    .log-item:last-child { border-bottom: none; }
+    .log-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--color-primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+    }
+    .log-body { flex: 1; }
+    .log-action { font-size: 13px; color: var(--color-text-main); font-weight: 500; }
+    .log-detail { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
+    .log-time   { font-size: 11px; color: var(--color-text-light); margin-top: 2px; }
+
+    /* 邀請 Modal 中的使用者預覽 */
+    .invite-user-preview {
+      background: var(--color-secondary);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: var(--space-sm);
+      margin-top: var(--space-sm);
+    }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<div id="app">
+
+  <!-- 頁首 -->
+  <div class="collab-header">
+    <div class="page-container">
+      <div class="breadcrumb" style="margin-bottom:8px;">
+        <div class="breadcrumb-item"><a href="trip-list.html">我的行程</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item"><a id="back-to-edit" href="#">行程編排</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item current">協作</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-sm);">
+        <h1 style="font-size:20px;font-weight:700;color:var(--color-text-main);" id="page-title">行程協作</h1>
+        <span class="badge badge-neutral" id="member-count-badge">— 人</span>
+      </div>
+
+      <!-- Tab 列 -->
+      <div class="tab-list" role="tablist">
+        <button class="tab-btn active" role="tab" aria-selected="true"  onclick="switchTab('members')">👥 成員</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" onclick="switchTab('messages')">💬 留言討論</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" onclick="switchTab('votes')">🗳 投票決策</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" onclick="switchTab('logs')">📋 操作紀錄</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主內容 -->
+  <div class="content-area">
+    <div class="page-container" style="max-width:760px;">
+
+      <!-- ── Tab: 成員 ── -->
+      <div id="tab-members" class="tab-panel active">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-md);">
+          <h2 style="font-size:15px;font-weight:600;color:var(--color-text-sub);">旅伴列表</h2>
+          <button class="btn btn-primary btn-sm" onclick="openInviteModal()">＋ 邀請旅伴</button>
+        </div>
+        <div id="members-list"></div>
+      </div>
+
+      <!-- ── Tab: 留言討論 ── -->
+      <div id="tab-messages" class="tab-panel" style="display:none;">
+        <div class="chat-wrap">
+          <div class="chat-list" id="chat-list">
+            <div style="text-align:center;padding:var(--space-lg);color:var(--color-text-light);font-size:13px;">
+              開始和旅伴討論行程吧！
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <textarea class="chat-input" id="chat-input" rows="1"
+                      placeholder="輸入訊息，按 Enter 送出（Shift+Enter 換行）"
+                      onkeydown="handleChatKey(event)"></textarea>
+            <button class="btn btn-primary btn-sm" onclick="sendMessage()" style="flex-shrink:0;padding:8px 16px;">送出</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab: 投票決策 ── -->
+      <div id="tab-votes" class="tab-panel" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-md);">
+          <h2 style="font-size:15px;font-weight:600;color:var(--color-text-sub);">投票列表</h2>
+          <button class="btn btn-primary btn-sm" onclick="toggleCreateVote()">＋ 建立新投票</button>
+        </div>
+
+        <!-- 建立投票面板 -->
+        <div class="create-vote-panel" id="create-vote-panel">
+          <div class="form-group">
+            <label class="form-label">投票主題 <span style="color:var(--color-accent-red)">*</span></label>
+            <input class="form-input" type="text" id="vote-title-input" placeholder="例：第二天下午去哪裡？"/>
+          </div>
+          <div id="vote-options-wrap">
+            <label class="form-label">選項</label>
+            <div class="option-row">
+              <input class="form-input" type="text" placeholder="選項 1" style="padding:8px 12px;"/>
+              <button class="btn btn-ghost btn-sm" style="color:var(--color-accent-red);padding:8px;" onclick="removeOption(this)" title="移除">✕</button>
+            </div>
+            <div class="option-row">
+              <input class="form-input" type="text" placeholder="選項 2" style="padding:8px 12px;"/>
+              <button class="btn btn-ghost btn-sm" style="color:var(--color-accent-red);padding:8px;" onclick="removeOption(this)" title="移除">✕</button>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="addOption()" style="margin-bottom:var(--space-md);">＋ 新增選項</button>
+          <div class="error-msg" id="vote-create-error" style="margin-bottom:var(--space-sm);"></div>
+          <div style="display:flex;gap:var(--space-sm);justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="toggleCreateVote()">取消</button>
+            <button class="btn btn-primary" onclick="createVote()">發起投票</button>
+          </div>
+        </div>
+
+        <div id="votes-list"></div>
+      </div>
+
+      <!-- ── Tab: 操作紀錄 ── -->
+      <div id="tab-logs" class="tab-panel" style="display:none;">
+        <h2 style="font-size:15px;font-weight:600;color:var(--color-text-sub);margin-bottom:var(--space-md);">操作紀錄</h2>
+        <div id="logs-list"></div>
+      </div>
+
+    </div>
+  </div>
+</div><!-- end #app -->
+
+<!-- ══════════════════════════════════════════
+     邀請旅伴 Modal
+══════════════════════════════════════════ -->
+<div class="modal-backdrop hidden" id="invite-modal" role="dialog" aria-modal="true" aria-labelledby="invite-modal-title">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title" id="invite-modal-title">邀請旅伴</h2>
+      <button class="modal-close" onclick="closeInviteModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <div style="display:flex;gap:var(--space-sm);">
+          <input class="form-input" type="email" id="invite-email"
+                 placeholder="輸入旅伴的 Email" oninput="lookupUser()"/>
+          <button class="btn btn-outline btn-sm" style="flex-shrink:0;" onclick="lookupUser()">查詢</button>
+        </div>
+      </div>
+      <div id="invite-user-preview" style="display:none;"></div>
+      <div class="error-msg"   id="invite-error"   style="margin-top:var(--space-sm);"></div>
+      <div class="success-msg" id="invite-success" style="margin-top:var(--space-sm);"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeInviteModal()">取消</button>
+      <button class="btn btn-primary" id="invite-confirm-btn" onclick="confirmInvite()" disabled>加入行程</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container" id="toast-container"></div>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+/* ══════════════════════════════════════════
+   頁面保護 & 初始化
+══════════════════════════════════════════ */
+const currentUser = getCurrentUser();
+if (!currentUser) window.location.href = 'login.html';
+
+const urlParams = new URLSearchParams(window.location.search);
+const tripId    = urlParams.get('id') || '';
+let   tripData  = tripId ? getTripById(tripId) : null;
+
+if (!tripData) {
+  alert('找不到行程，請重新選擇。');
+  window.location.href = 'trip-list.html';
+}
+
+/* 動態設定頁首連結 */
+document.getElementById('back-to-edit').href = `trip-edit.html?id=${tripId}`;
+document.getElementById('page-title').textContent = tripData.name + ' — 協作';
+
+let activeTab         = 'members';
+let foundInviteUser   = null;
+
+/* ══════════════════════════════════════════
+   工具
+══════════════════════════════════════════ */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function fmtDateFull(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function avatarLetter(name) {
+  return (name || '?').charAt(0).toUpperCase();
+}
+function reload() {
+  tripData = getTripById(tripId);
+}
+function saveAndReload() {
+  saveTrip(tripData);
+  reload();
+}
+function showToast(msg, type='') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+/* ══════════════════════════════════════════
+   Tab 切換
+══════════════════════════════════════════ */
+const TAB_IDS = ['members','messages','votes','logs'];
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    const isActive = TAB_IDS[i] === tab;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive);
+  });
+  TAB_IDS.forEach(id => {
+    document.getElementById('tab-' + id).style.display = id === tab ? 'block' : 'none';
+  });
+
+  reload();
+  if (tab === 'members')  renderMembers();
+  if (tab === 'messages') { renderMessages(); scrollChatToBottom(); }
+  if (tab === 'votes')    renderVotes();
+  if (tab === 'logs')     renderLogs();
+}
+
+/* ══════════════════════════════════════════
+   Tab 1：成員
+══════════════════════════════════════════ */
+function renderMembers() {
+  const members = tripData.members || [];
+  document.getElementById('member-count-badge').textContent = members.length + ' 人';
+
+  if (members.length === 0) {
+    document.getElementById('members-list').innerHTML =
+      `<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">尚未加入成員</div></div>`;
+    return;
+  }
+
+  document.getElementById('members-list').innerHTML = members.map(m => {
+    const isOwner = m.role === 'owner';
+    const user    = getUserById(m.userId);
+    const roleLabel = isOwner
+      ? `<span class="badge badge-primary" style="font-size:11px;">建立者</span>`
+      : `<span class="badge badge-neutral"  style="font-size:11px;">成員</span>`;
+
+    return `
+      <div class="member-card">
+        <div class="member-avatar ${isOwner ? '' : 'guest-color'}">${avatarLetter(m.name)}</div>
+        <div class="member-info">
+          <div class="member-name">${escHtml(m.name)} ${roleLabel}</div>
+          <div class="member-email">${escHtml(m.email)}</div>
+          <div class="member-joined">加入時間：${fmtDateFull(m.joinedAt)}</div>
+        </div>
+        ${!isOwner && tripData.ownerId === currentUser.id ? `
+          <button class="btn btn-ghost btn-sm" style="color:var(--color-accent-red);"
+                  onclick="removeMember('${m.userId}')" title="移除成員">移除</button>` : ''}
+      </div>`;
+  }).join('');
+}
+
+/* ── 邀請 Modal ── */
+function openInviteModal() {
+  foundInviteUser = null;
+  document.getElementById('invite-email').value = '';
+  document.getElementById('invite-user-preview').style.display = 'none';
+  document.getElementById('invite-user-preview').innerHTML = '';
+  document.getElementById('invite-error').style.display   = 'none';
+  document.getElementById('invite-success').style.display = 'none';
+  document.getElementById('invite-confirm-btn').disabled  = true;
+  document.getElementById('invite-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('invite-email').focus(), 50);
+}
+function closeInviteModal() {
+  document.getElementById('invite-modal').classList.add('hidden');
+}
+
+function lookupUser() {
+  const email = document.getElementById('invite-email').value.trim().toLowerCase();
+  const errEl = document.getElementById('invite-error');
+  const preEl = document.getElementById('invite-user-preview');
+  const btnEl = document.getElementById('invite-confirm-btn');
+
+  errEl.style.display = 'none';
+  preEl.style.display = 'none';
+  btnEl.disabled = true;
+  foundInviteUser = null;
+
+  if (!email) return;
+
+  const user = findUserByEmail(email);
+  if (!user) {
+    errEl.textContent = '找不到此 Email 的使用者';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const alreadyMember = (tripData.members || []).some(m => m.userId === user.id);
+  if (alreadyMember) {
+    errEl.textContent = '此使用者已在行程中';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  foundInviteUser = user;
+  preEl.innerHTML = `
+    <div class="invite-user-preview">
+      <div class="member-avatar" style="width:36px;height:36px;font-size:14px;">${avatarLetter(user.name)}</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;">${escHtml(user.name)}</div>
+        <div style="font-size:12px;color:var(--color-text-light);">${escHtml(user.email)}</div>
+      </div>
+      <span class="badge badge-success" style="margin-left:auto;">找到使用者</span>
+    </div>`;
+  preEl.style.display = 'block';
+  btnEl.disabled = false;
+}
+
+function confirmInvite() {
+  if (!foundInviteUser) return;
+  tripData.members = tripData.members || [];
+  tripData.members.push({
+    userId:   foundInviteUser.id,
+    name:     foundInviteUser.name,
+    email:    foundInviteUser.email,
+    role:     'member',
+    joinedAt: new Date().toISOString(),
+  });
+  addLog('邀請成員', `邀請了 ${foundInviteUser.name}（${foundInviteUser.email}）加入行程`);
+  saveAndReload();
+  closeInviteModal();
+  renderMembers();
+  showToast(`已邀請 ${foundInviteUser.name} 加入行程！`, 'success');
+}
+
+function removeMember(userId) {
+  const member = (tripData.members||[]).find(m => m.userId === userId);
+  if (!member) return;
+  if (!confirm(`確定移除「${member.name}」嗎？`)) return;
+  tripData.members = tripData.members.filter(m => m.userId !== userId);
+  addLog('移除成員', `移除了 ${member.name}（${member.email}）`);
+  saveAndReload();
+  renderMembers();
+  showToast('已移除成員', 'error');
+}
+
+/* ══════════════════════════════════════════
+   Tab 2：留言討論
+══════════════════════════════════════════ */
+function renderMessages() {
+  const msgs  = tripData.messages || [];
+  const listEl = document.getElementById('chat-list');
+
+  if (msgs.length === 0) {
+    listEl.innerHTML = `
+      <div style="text-align:center;padding:var(--space-lg);color:var(--color-text-light);font-size:13px;">
+        開始和旅伴討論行程吧！💬
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = msgs.map(msg => {
+    const isMine = msg.userId === currentUser.id;
+    return `
+      <div>
+        <div class="chat-bubble-row${isMine ? ' mine' : ''}">
+          ${!isMine ? `<div class="chat-avatar">${avatarLetter(msg.userName)}</div>` : ''}
+          <div>
+            ${!isMine ? `<div style="font-size:11px;color:var(--color-text-light);margin-bottom:3px;">${escHtml(msg.userName)}</div>` : ''}
+            <div class="chat-bubble ${isMine ? 'mine' : 'other'}">${escHtml(msg.content)}</div>
+          </div>
+        </div>
+        <div class="chat-meta${isMine ? ' mine' : ''}">${fmtTime(msg.createdAt)}</div>
+      </div>`;
+  }).join('');
+}
+
+function scrollChatToBottom() {
+  setTimeout(() => {
+    const list = document.getElementById('chat-list');
+    list.scrollTop = list.scrollHeight;
+  }, 50);
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function sendMessage() {
+  const input   = document.getElementById('chat-input');
+  const content = input.value.trim();
+  if (!content) return;
+
+  tripData.messages = tripData.messages || [];
+  tripData.messages.push({
+    id:        generateId(),
+    userId:    currentUser.id,
+    userName:  currentUser.name,
+    content,
+    createdAt: new Date().toISOString(),
+  });
+
+  saveAndReload();
+  input.value = '';
+  renderMessages();
+  scrollChatToBottom();
+}
+
+/* ══════════════════════════════════════════
+   Tab 3：投票決策
+══════════════════════════════════════════ */
+function renderVotes() {
+  const votes  = tripData.votes || [];
+  const listEl = document.getElementById('votes-list');
+
+  if (votes.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🗳️</div>
+        <div class="empty-state-title">還沒有投票</div>
+        <div class="empty-state-desc">點擊「建立新投票」讓旅伴一起決定行程！</div>
+      </div>`;
+    return;
+  }
+
+  const members     = tripData.members || [];
+  const totalVoters = members.length;
+
+  listEl.innerHTML = votes.map(vote => {
+    const allVoteIds = vote.options.flatMap(o => o.votes);
+    const voterIds   = [...new Set(allVoteIds)];
+    const myVote     = vote.options.find(o => o.votes.includes(currentUser.id));
+    const totalVotes = allVoteIds.length;
+
+    const hasVoted   = !!myVote;
+    const notVoted   = members.filter(m => !voterIds.includes(m.userId));
+
+    const optionsHTML = vote.options.map(opt => {
+      const pct = totalVotes > 0 ? Math.round((opt.votes.length / totalVotes) * 100) : 0;
+      const voterNames = opt.votes.map(uid => {
+        const m = members.find(m => m.userId === uid);
+        return m ? m.name : '使用者';
+      }).join('、');
+      const isMyChoice = opt.votes.includes(currentUser.id);
+
+      return `
+        <div class="vote-option">
+          <div class="vote-option-header">
+            <div style="display:flex;align-items:center;gap:var(--space-sm);">
+              <span class="vote-option-label">${escHtml(opt.label)}</span>
+              ${isMyChoice ? `<span style="font-size:11px;color:var(--color-primary);">✓ 你的選擇</span>` : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--space-sm);">
+              <span class="vote-option-count">${opt.votes.length} 票（${pct}%）</span>
+              <button class="vote-btn${isMyChoice ? ' voted' : ''}"
+                      onclick="castVote('${vote.id}','${opt.id}')">
+                ${isMyChoice ? '✓ 已投票' : '投票'}
+              </button>
+            </div>
+          </div>
+          <div class="vote-progress-bg">
+            <div class="vote-progress-fill" style="width:${pct}%;"></div>
+          </div>
+          ${voterNames ? `<div class="vote-voters">投票者：${escHtml(voterNames)}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="vote-card">
+        <div class="vote-title">🗳 ${escHtml(vote.title)}</div>
+        ${optionsHTML}
+        <div class="vote-footer">
+          <span style="display:flex;gap:var(--space-sm);align-items:center;flex-wrap:wrap;">
+            ${hasVoted
+              ? `<span class="voted-badge">你已投票</span>`
+              : `<span class="not-voted-badge">尚未投票</span>`}
+            ${notVoted.length > 0
+              ? `<span style="color:var(--color-text-light);">待投票：${escHtml(notVoted.map(m=>m.name).join('、'))}</span>`
+              : `<span style="color:var(--color-success-text);">✓ 全員已投票</span>`}
+          </span>
+          <span style="color:var(--color-text-light);">${fmtDateFull(vote.createdAt)}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleCreateVote() {
+  const panel = document.getElementById('create-vote-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    document.getElementById('vote-title-input').focus();
+  }
+}
+
+function addOption() {
+  const wrap = document.getElementById('vote-options-wrap');
+  const count = wrap.querySelectorAll('.option-row').length + 1;
+  const row = document.createElement('div');
+  row.className = 'option-row';
+  row.innerHTML = `
+    <input class="form-input" type="text" placeholder="選項 ${count}" style="padding:8px 12px;"/>
+    <button class="btn btn-ghost btn-sm" style="color:var(--color-accent-red);padding:8px;"
+            onclick="removeOption(this)" title="移除">✕</button>`;
+  wrap.appendChild(row);
+}
+
+function removeOption(btn) {
+  const rows = document.querySelectorAll('#vote-options-wrap .option-row');
+  if (rows.length <= 2) { showToast('至少需要 2 個選項', ''); return; }
+  btn.closest('.option-row').remove();
+}
+
+function createVote() {
+  const title = document.getElementById('vote-title-input').value.trim();
+  const errEl = document.getElementById('vote-create-error');
+
+  if (!title) {
+    errEl.textContent = '⚠ 請輸入投票主題'; errEl.style.display = 'block'; return;
+  }
+
+  const rows    = document.querySelectorAll('#vote-options-wrap .option-row input');
+  const options = [...rows].map(i => i.value.trim()).filter(Boolean);
+  if (options.length < 2) {
+    errEl.textContent = '⚠ 至少需要 2 個選項'; errEl.style.display = 'block'; return;
+  }
+  errEl.style.display = 'none';
+
+  const newVote = {
+    id:        generateId(),
+    tripId,
+    title,
+    options:   options.map(label => ({ id: generateId(), label, votes: [] })),
+    createdAt: new Date().toISOString(),
+  };
+
+  tripData.votes = tripData.votes || [];
+  tripData.votes.push(newVote);
+  addLog('建立投票', `建立了投票：「${title}」`);
+  saveAndReload();
+
+  /* 重置表單 */
+  document.getElementById('vote-title-input').value = '';
+  const wrap = document.getElementById('vote-options-wrap');
+  wrap.querySelectorAll('.option-row').forEach((r,i) => {
+    r.querySelector('input').value = '';
+    if (i >= 2) r.remove();
+  });
+  toggleCreateVote();
+  renderVotes();
+  showToast('投票已建立！', 'success');
+}
+
+function castVote(voteId, optionId) {
+  reload();
+  const vote = (tripData.votes||[]).find(v => v.id === voteId);
+  if (!vote) return;
+
+  /* 移除舊票（同一投票中切換選項） */
+  vote.options.forEach(o => {
+    o.votes = o.votes.filter(uid => uid !== currentUser.id);
+  });
+
+  /* 找到目標選項 */
+  const opt = vote.options.find(o => o.id === optionId);
+  if (!opt) return;
+
+  /* 若點的是原本已選的，就取消投票（已在上面移除）；否則加票 */
+  const wasMyVote = false; // 已清除，直接投新票
+  opt.votes.push(currentUser.id);
+
+  addLog('投票', `在「${vote.title}」投票給「${opt.label}」`);
+  saveAndReload();
+  renderVotes();
+}
+
+/* ══════════════════════════════════════════
+   Tab 4：操作紀錄
+══════════════════════════════════════════ */
+function renderLogs() {
+  const logs   = [...(tripData.logs || [])].reverse(); // 最新在前
+  const listEl = document.getElementById('logs-list');
+
+  if (logs.length === 0) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📋</div>
+        <div class="empty-state-title">尚無操作紀錄</div>
+      </div>`;
+    return;
+  }
+
+  listEl.innerHTML = `<div>${logs.map(log => `
+    <div class="log-item">
+      <div class="log-avatar">${avatarLetter(log.userName || '?')}</div>
+      <div class="log-body">
+        <div class="log-action">
+          <strong>${escHtml(log.userName || '使用者')}</strong>
+          <span style="color:var(--color-text-sub);"> ${escHtml(log.action)}</span>
+        </div>
+        <div class="log-detail">${escHtml(log.detail || '')}</div>
+        <div class="log-time">${fmtDateFull(log.timestamp)}</div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+/* ══════════════════════════════════════════
+   操作 log 記錄
+══════════════════════════════════════════ */
+function addLog(action, detail) {
+  tripData.logs = tripData.logs || [];
+  tripData.logs.push({
+    id:        generateId(),
+    userId:    currentUser.id,
+    userName:  currentUser.name,
+    action,
+    detail,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/* ══════════════════════════════════════════
+   Escape 關閉 Modal
+══════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeInviteModal();
+});
+
+/* ══════════════════════════════════════════
+   初始化
+══════════════════════════════════════════ */
+renderNav();
+renderFooter();
+renderMembers();
+document.getElementById('member-count-badge').textContent =
+  (tripData.members || []).length + ' 人';
+</script>
 </body>
 </html>

@@ -5,16 +5,824 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent TT — 費用管理</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── 頁首 ── */
+    .expense-header {
+      background: #fff;
+      border-bottom: 1px solid var(--color-border-light);
+      padding: var(--space-md) 0 0;
+      position: sticky; top: 60px; z-index: 80;
+    }
+    .content-area { padding: var(--space-xl) 0 var(--space-3xl); }
+
+    /* ── 超預算橫幅 ── */
+    .overbudget-banner {
+      background: var(--color-danger);
+      border-left: 4px solid var(--color-accent-red);
+      color: var(--color-danger-text);
+      padding: 10px var(--space-xl);
+      font-size: 13px; font-weight: 500;
+      display: none; align-items: center; gap: var(--space-sm);
+    }
+    .overbudget-banner.show { display: flex; }
+
+    /* ── 四個統計卡 ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-md);
+      margin-bottom: var(--space-xl);
+    }
+    .stats-card {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .stats-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .stats-card.budget::before   { background: var(--color-primary); }
+    .stats-card.spent::before    { background: var(--color-accent-red); }
+    .stats-card.remaining::before{ background: var(--color-accent-green); }
+    .stats-card.per-person::before{ background: var(--color-accent-yellow); }
+
+    .stats-icon  { font-size: 22px; margin-bottom: 6px; }
+    .stats-label { font-size: 12px; color: var(--color-text-light); margin-bottom: 6px; letter-spacing: 0.5px; }
+    .stats-value { font-size: 24px; font-weight: 800; color: var(--color-text-main); line-height: 1.1; }
+    .stats-value.over { color: var(--color-accent-red); }
+    .stats-value.good { color: var(--color-accent-green); }
+    .stats-sub   { font-size: 11px; color: var(--color-text-light); margin-top: 4px; }
+
+    /* ── 進度條區塊 ── */
+    .budget-progress-section {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+    .budget-progress-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: var(--space-sm);
+      font-size: 13px;
+    }
+    .budget-progress-bar {
+      height: 12px; background: var(--color-border-light);
+      border-radius: 99px; overflow: hidden;
+    }
+    .budget-progress-fill {
+      height: 100%; border-radius: 99px;
+      transition: width 0.6s ease, background 0.3s ease;
+    }
+    .budget-progress-fill.normal  { background: var(--color-primary); }
+    .budget-progress-fill.warning { background: #D4861A; }
+    .budget-progress-fill.danger  { background: var(--color-accent-red); }
+    .budget-progress-ticks {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--color-text-light); margin-top: 4px;
+    }
+
+    /* ── 支出表格 ── */
+    .expense-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .expense-table th {
+      text-align: left; padding: 10px 14px;
+      background: var(--color-secondary);
+      color: var(--color-text-sub); font-weight: 600; font-size: 12px;
+      border-bottom: 1px solid var(--color-border-light);
+    }
+    .expense-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--color-border-light);
+      color: var(--color-text-main);
+      vertical-align: middle;
+    }
+    .expense-table tr:last-child td { border-bottom: none; }
+    .expense-table tr:hover td { background: #fafaf7; }
+    .expense-table .total-row td {
+      background: var(--color-secondary);
+      font-weight: 700; border-top: 2px solid var(--color-border);
+      border-bottom: none;
+    }
+    .expense-table-wrap {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .type-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; padding: 2px 8px; border-radius: 99px;
+    }
+
+    /* ── 分帳結算 ── */
+    .settle-card {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-md);
+      display: flex; align-items: center; gap: var(--space-lg);
+    }
+    .settle-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--color-primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 700; flex-shrink: 0;
+    }
+    .settle-name  { font-size: 15px; font-weight: 600; color: var(--color-text-main); margin-bottom: 3px; }
+    .settle-detail { font-size: 12px; color: var(--color-text-sub); }
+    .settle-amount {
+      margin-left: auto; text-align: right; flex-shrink: 0;
+    }
+    .settle-diff {
+      font-size: 20px; font-weight: 800; line-height: 1.1;
+    }
+    .settle-diff.positive { color: var(--color-success-text); }
+    .settle-diff.negative { color: var(--color-accent-red); }
+    .settle-diff.zero     { color: var(--color-text-light); }
+    .settle-label { font-size: 11px; color: var(--color-text-light); margin-top: 2px; }
+
+    /* ── 分帳說明 ── */
+    .settle-info-box {
+      background: var(--color-info);
+      border: 1px solid #b8d0f0;
+      border-radius: var(--radius-md);
+      padding: 12px var(--space-md);
+      font-size: 13px; color: var(--color-info-text);
+      margin-bottom: var(--space-lg);
+      display: flex; gap: var(--space-sm); align-items: flex-start;
+    }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<!-- 超預算橫幅 -->
+<div class="overbudget-banner" id="overbudget-banner" role="alert">
+  <span>🚨</span>
+  <span id="overbudget-msg">已超出預算！</span>
+</div>
+
+<div id="app">
+
+  <!-- 頁首 -->
+  <div class="expense-header">
+    <div class="page-container">
+      <div class="breadcrumb" style="margin-bottom:8px;">
+        <div class="breadcrumb-item"><a href="trip-list.html">我的行程</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item"><a id="back-to-edit" href="#">行程編排</a></div>
+        <span class="breadcrumb-sep">›</span>
+        <div class="breadcrumb-item current">費用管理</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-sm);">
+        <h1 style="font-size:20px;font-weight:700;" id="page-title">費用管理</h1>
+        <div style="display:flex;gap:var(--space-sm);">
+          <button class="btn btn-outline btn-sm" onclick="openBudgetModal()">✏️ 修改預算</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddExpenseModal()">＋ 新增支出</button>
+        </div>
+      </div>
+
+      <!-- Tab 列 -->
+      <div class="tab-list" role="tablist">
+        <button class="tab-btn active" role="tab" aria-selected="true"  onclick="switchTab('detail')">📋 支出明細</button>
+        <button class="tab-btn"        role="tab" aria-selected="false" onclick="switchTab('settle')">⚖️ 分帳結算</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主內容 -->
+  <div class="content-area">
+    <div class="page-container">
+
+      <!-- 統計卡 -->
+      <div class="stats-grid" id="stats-grid">
+        <!-- 動態填入 -->
+      </div>
+
+      <!-- 預算進度條 -->
+      <div class="budget-progress-section" id="budget-progress-section">
+        <div class="budget-progress-header">
+          <span style="font-weight:600;font-size:14px;">預算使用狀況</span>
+          <span id="budget-pct-text" style="font-weight:700;"></span>
+        </div>
+        <div class="budget-progress-bar">
+          <div class="budget-progress-fill" id="budget-progress-fill" style="width:0%;"></div>
+        </div>
+        <div class="budget-progress-ticks">
+          <span>0%</span><span>25%</span><span>50%</span>
+          <span style="color:#D4861A;font-weight:600;">80%</span>
+          <span style="color:var(--color-accent-red);font-weight:600;">100%</span>
+        </div>
+      </div>
+
+      <!-- Tab: 支出明細 -->
+      <div id="tab-detail">
+        <div id="expense-list-wrap"></div>
+      </div>
+
+      <!-- Tab: 分帳結算 -->
+      <div id="tab-settle" style="display:none;">
+        <div class="settle-info-box">
+          <span>💡</span>
+          <div>
+            <strong>分帳說明：</strong>依照各人實際付出與均攤金額的差額計算。
+            <strong>綠色（+）</strong>表示可向他人收款；<strong>紅色（−）</strong>表示需補繳給他人。
+          </div>
+        </div>
+        <div id="settle-list"></div>
+        <div id="settle-transactions" style="margin-top:var(--space-xl);"></div>
+      </div>
+
+    </div>
+  </div>
+</div><!-- end #app -->
+
+<!-- ══ 修改預算 Modal ══ -->
+<div class="modal-backdrop hidden" id="budget-modal" role="dialog" aria-modal="true" aria-labelledby="budget-modal-title">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title" id="budget-modal-title">修改預算</h2>
+      <button class="modal-close" onclick="closeBudgetModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">總預算（NT$）<span style="color:var(--color-accent-red)">*</span></label>
+        <input class="form-input" type="number" id="budget-input" min="0" step="100" placeholder="例：8000"/>
+      </div>
+      <div class="error-msg" id="budget-error" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeBudgetModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveBudget()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 新增支出 Modal ══ -->
+<div class="modal-backdrop hidden" id="add-expense-modal" role="dialog" aria-modal="true" aria-labelledby="add-expense-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="add-expense-title">新增支出</h2>
+      <button class="modal-close" onclick="closeAddExpenseModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">項目名稱 <span style="color:var(--color-accent-red)">*</span></label>
+        <input class="form-input" type="text" id="exp-name" placeholder="例：集集香蕉餐廳午餐"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md);">
+        <div class="form-group">
+          <label class="form-label">金額（NT$）<span style="color:var(--color-accent-red)">*</span></label>
+          <input class="form-input" type="number" id="exp-amount" min="0" step="1" placeholder="0"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">費用類型</label>
+          <select class="form-select" id="exp-type">
+            <option value="transport">🚗 交通</option>
+            <option value="accommodation">🏨 住宿</option>
+            <option value="food" selected>🍽 餐飲</option>
+            <option value="ticket">🎟 票務</option>
+            <option value="shopping">🛍 購物</option>
+            <option value="other">📦 其他</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">付款人 <span style="color:var(--color-accent-red)">*</span></label>
+        <select class="form-select" id="exp-paidby">
+          <!-- 動態填入成員 -->
+        </select>
+      </div>
+      <div class="error-msg" id="exp-error" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeAddExpenseModal()">取消</button>
+      <button class="btn btn-primary" onclick="addExpense()">新增支出</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 刪除確認 Modal ══ -->
+<div class="modal-backdrop hidden" id="delete-expense-modal" role="dialog" aria-modal="true">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title">刪除支出</h2>
+      <button class="modal-close" onclick="closeDeleteExpenseModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--color-text-sub);">
+        確定刪除「<strong id="delete-expense-name"></strong>」這筆支出嗎？
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeDeleteExpenseModal()">取消</button>
+      <button class="btn btn-danger"  onclick="confirmDeleteExpense()">確認刪除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<div id="footer-container"></div>
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+/* ══════════════════════════════════════
+   初始化
+══════════════════════════════════════ */
+const currentUser = getCurrentUser();
+if (!currentUser) window.location.href = 'login.html';
+
+const urlParams = new URLSearchParams(window.location.search);
+const tripId    = urlParams.get('id') || '';
+let   tripData  = tripId ? getTripById(tripId) : null;
+
+if (!tripData) {
+  alert('找不到行程，請重新選擇。');
+  window.location.href = 'trip-list.html';
+}
+
+document.getElementById('back-to-edit').href    = `trip-edit.html?id=${tripId}`;
+document.getElementById('page-title').textContent = tripData.name + ' — 費用管理';
+
+let deletingExpenseId = null;
+let activeTab = 'detail';
+
+/* ══════════════════════════════════════
+   工具
+══════════════════════════════════════ */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmtMoney(n) { return 'NT$ ' + Number(n).toLocaleString(); }
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+function reload() { tripData = getTripById(tripId); }
+function showToast(msg, type='') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+/* ══════════════════════════════════════
+   費用計算
+══════════════════════════════════════ */
+function calcStats() {
+  const expenses = tripData.expenses || [];
+  const members  = tripData.members  || [];
+  const budget   = Number(tripData.budget) || 0;
+  const spent    = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const remaining = budget - spent;
+  const perPerson = members.length > 0 ? spent / members.length : spent;
+  const pct       = budget > 0 ? Math.min((spent / budget) * 100, 999) : 0;
+
+  return { budget, spent, remaining, perPerson, pct, memberCount: members.length };
+}
+
+/* ══════════════════════════════════════
+   統計卡渲染
+══════════════════════════════════════ */
+function renderStats() {
+  const { budget, spent, remaining, perPerson, pct } = calcStats();
+
+  const remainClass = remaining < 0 ? 'over' : remaining === 0 ? '' : 'good';
+  const remainSign  = remaining < 0 ? '' : remaining > 0 ? '' : '';
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stats-card budget">
+      <div class="stats-icon">💰</div>
+      <div class="stats-label">總預算</div>
+      <div class="stats-value">${budget > 0 ? fmtMoney(budget) : '未設定'}</div>
+      <div class="stats-sub">
+        <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;color:var(--color-text-light);"
+                onclick="openBudgetModal()">修改</button>
+      </div>
+    </div>
+    <div class="stats-card spent">
+      <div class="stats-icon">🧾</div>
+      <div class="stats-label">已花費</div>
+      <div class="stats-value">${fmtMoney(spent)}</div>
+      <div class="stats-sub">${(tripData.expenses||[]).length} 筆支出</div>
+    </div>
+    <div class="stats-card remaining">
+      <div class="stats-icon">${remaining < 0 ? '⚠️' : '💚'}</div>
+      <div class="stats-label">剩餘預算</div>
+      <div class="stats-value ${remainClass}">
+        ${budget > 0 ? fmtMoney(Math.abs(remaining)) : '—'}
+      </div>
+      <div class="stats-sub">${budget > 0 ? (remaining < 0 ? '已超出預算' : '預算內') : '尚未設定預算'}</div>
+    </div>
+    <div class="stats-card per-person">
+      <div class="stats-icon">👤</div>
+      <div class="stats-label">每人均攤</div>
+      <div class="stats-value">${fmtMoney(Math.round(perPerson))}</div>
+      <div class="stats-sub">${calcStats().memberCount} 人平均</div>
+    </div>`;
+
+  renderProgressBar(pct, spent, budget);
+  renderOverBudgetBanner(pct, spent, budget);
+}
+
+/* ══════════════════════════════════════
+   進度條
+══════════════════════════════════════ */
+function renderProgressBar(pct, spent, budget) {
+  const section = document.getElementById('budget-progress-section');
+  if (budget <= 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const fillEl   = document.getElementById('budget-progress-fill');
+  const pctText  = document.getElementById('budget-pct-text');
+  const displayPct = Math.min(pct, 100);
+
+  fillEl.style.width = displayPct + '%';
+  fillEl.className   = 'budget-progress-fill';
+
+  if (pct >= 100) {
+    fillEl.classList.add('danger');
+    pctText.textContent = Math.round(pct) + '%  ⚠ 已超出';
+    pctText.style.color = 'var(--color-accent-red)';
+  } else if (pct >= 80) {
+    fillEl.classList.add('warning');
+    pctText.textContent = Math.round(pct) + '%  注意：即將達預算上限';
+    pctText.style.color = '#D4861A';
+  } else {
+    fillEl.classList.add('normal');
+    pctText.textContent = Math.round(pct) + '%';
+    pctText.style.color = 'var(--color-text-sub)';
+  }
+}
+
+/* ══════════════════════════════════════
+   超預算橫幅
+══════════════════════════════════════ */
+function renderOverBudgetBanner(pct, spent, budget) {
+  const banner = document.getElementById('overbudget-banner');
+  const msg    = document.getElementById('overbudget-msg');
+
+  if (budget > 0 && pct >= 100) {
+    const over = spent - budget;
+    msg.textContent = `已超出預算 ${fmtMoney(over)}！請考慮調整預算或削減部分支出。`;
+    banner.classList.add('show');
+  } else if (budget > 0 && pct >= 80) {
+    msg.textContent = `已使用預算的 ${Math.round(pct)}%，剩餘 ${fmtMoney(budget - spent)}，注意控制支出。`;
+    banner.className = 'overbudget-banner'; // 移除 show，改用 warning 樣式顯示
+    banner.style.background  = 'var(--color-warning)';
+    banner.style.borderColor = '#D4861A';
+    banner.style.color       = 'var(--color-warning-text)';
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+/* ══════════════════════════════════════
+   Tab 切換
+══════════════════════════════════════ */
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    const isActive = (i === 0 && tab === 'detail') || (i === 1 && tab === 'settle');
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive);
+  });
+  document.getElementById('tab-detail').style.display = tab === 'detail' ? 'block' : 'none';
+  document.getElementById('tab-settle').style.display = tab === 'settle' ? 'block' : 'none';
+
+  reload();
+  if (tab === 'detail') renderExpenseList();
+  if (tab === 'settle') renderSettle();
+}
+
+/* ══════════════════════════════════════
+   費用類型設定
+══════════════════════════════════════ */
+const TYPE_CONFIG = {
+  transport:     { label:'交通',  emoji:'🚗', bg:'#E8F0FA', color:'#2B4DA0' },
+  accommodation: { label:'住宿',  emoji:'🏨', bg:'#E8F4ED', color:'#2C6B4A' },
+  food:          { label:'餐飲',  emoji:'🍽', bg:'#FBEAEA', color:'#C4514A' },
+  ticket:        { label:'票務',  emoji:'🎟', bg:'#F0E5BC', color:'#7A5A1A' },
+  shopping:      { label:'購物',  emoji:'🛍', bg:'#F3E8FA', color:'#6B2DA0' },
+  other:         { label:'其他',  emoji:'📦', bg:'#EDEBE4', color:'#6B6354' },
+};
+function getTypeCfg(type) { return TYPE_CONFIG[type] || TYPE_CONFIG.other; }
+
+/* ══════════════════════════════════════
+   Tab 1：支出明細
+══════════════════════════════════════ */
+function renderExpenseList() {
+  const expenses = tripData.expenses || [];
+  const wrapEl   = document.getElementById('expense-list-wrap');
+
+  if (expenses.length === 0) {
+    wrapEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🧾</div>
+        <div class="empty-state-title">還沒有支出記錄</div>
+        <div class="empty-state-desc">點擊右上角「＋ 新增支出」開始記帳</div>
+        <button class="btn btn-primary" onclick="openAddExpenseModal()">＋ 新增支出</button>
+      </div>`;
+    return;
+  }
+
+  const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
+
+  const rows = expenses.map(exp => {
+    const cfg = getTypeCfg(exp.type);
+    return `
+      <tr>
+        <td>
+          <span class="type-pill" style="background:${cfg.bg};color:${cfg.color};">
+            ${cfg.emoji} ${cfg.label}
+          </span>
+        </td>
+        <td style="font-weight:500;">${escHtml(exp.name)}</td>
+        <td>${escHtml(exp.paidBy || '—')}</td>
+        <td style="font-weight:700;color:var(--color-accent-red);text-align:right;">
+          NT$ ${Number(exp.amount).toLocaleString()}
+        </td>
+        <td style="text-align:right;">
+          <span style="font-size:11px;color:var(--color-text-light);">${fmtDate(exp.createdAt)}</span>
+        </td>
+        <td style="text-align:right;">
+          <button class="btn btn-ghost btn-sm" style="color:var(--color-accent-red);padding:4px 8px;"
+                  onclick="openDeleteExpenseModal('${exp.id}','${escHtml(exp.name).replace(/'/g,"&#39;")}')">🗑</button>
+        </td>
+      </tr>`;
+  }).join('');
+
+  wrapEl.innerHTML = `
+    <div class="expense-table-wrap">
+      <table class="expense-table">
+        <thead>
+          <tr>
+            <th style="width:90px;">類型</th>
+            <th>項目名稱</th>
+            <th>付款人</th>
+            <th style="text-align:right;">金額</th>
+            <th style="text-align:right;width:70px;">日期</th>
+            <th style="width:50px;"></th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="3" style="text-align:right;font-size:13px;letter-spacing:1px;">合計</td>
+            <td style="text-align:right;font-size:16px;color:var(--color-accent-red);">
+              NT$ ${totalSpent.toLocaleString()}
+            </td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+}
+
+/* ══════════════════════════════════════
+   Tab 2：分帳結算
+══════════════════════════════════════ */
+function renderSettle() {
+  const expenses = tripData.expenses || [];
+  const members  = tripData.members  || [];
+  const listEl   = document.getElementById('settle-list');
+  const txEl     = document.getElementById('settle-transactions');
+
+  if (members.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">行程尚無成員</div></div>`;
+    txEl.innerHTML = '';
+    return;
+  }
+
+  const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const fairShare  = members.length > 0 ? totalSpent / members.length : 0;
+
+  /* 每人已付金額 */
+  const paidMap = {};
+  members.forEach(m => { paidMap[m.name] = 0; });
+  expenses.forEach(e => {
+    const name = e.paidBy || '';
+    if (name in paidMap) paidMap[name] += Number(e.amount);
+    else paidMap[name] = Number(e.amount); // 非成員姓名也計入
+  });
+
+  /* 每人差額 */
+  const balances = members.map(m => {
+    const paid = paidMap[m.name] || 0;
+    const diff = paid - fairShare; // 正：可收回；負：需補繳
+    return { ...m, paid, fairShare, diff };
+  });
+
+  /* 成員卡片 */
+  listEl.innerHTML = balances.map(b => {
+    const diffClass = b.diff > 0.5 ? 'positive' : b.diff < -0.5 ? 'negative' : 'zero';
+    const diffSign  = b.diff > 0 ? '+' : '';
+    const diffLabel = b.diff > 0.5 ? '可向他人收款'
+                    : b.diff < -0.5 ? '需補繳給他人'
+                    : '已結清';
+    const initial = (b.name || '?').charAt(0).toUpperCase();
+
+    return `
+      <div class="settle-card">
+        <div class="settle-avatar">${initial}</div>
+        <div style="flex:1;">
+          <div class="settle-name">${escHtml(b.name)}</div>
+          <div class="settle-detail">
+            實際付出 <strong style="color:var(--color-text-main);">${fmtMoney(Math.round(b.paid))}</strong>
+            ／ 應付均攤 <strong style="color:var(--color-text-main);">${fmtMoney(Math.round(b.fairShare))}</strong>
+          </div>
+        </div>
+        <div class="settle-amount">
+          <div class="settle-diff ${diffClass}">
+            ${diffSign}${fmtMoney(Math.abs(Math.round(b.diff)))}
+          </div>
+          <div class="settle-label">${diffLabel}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  /* 轉帳建議 */
+  const debtors  = balances.filter(b => b.diff < -0.5).map(b => ({ ...b, owes: -b.diff }));
+  const creditors= balances.filter(b => b.diff >  0.5).map(b => ({ ...b, owes:  b.diff }));
+
+  if (debtors.length === 0 || creditors.length === 0) {
+    txEl.innerHTML = `
+      <div class="alert alert-success">
+        ✅ 所有人費用已平衡，無需轉帳！
+      </div>`;
+    return;
+  }
+
+  /* 最小轉帳次數演算法（greedy） */
+  const txs = [];
+  const dList = debtors.map(d => ({ name: d.name, amount: d.owes }));
+  const cList = creditors.map(c => ({ name: c.name, amount: c.owes }));
+
+  let di = 0, ci = 0;
+  while (di < dList.length && ci < cList.length) {
+    const transfer = Math.min(dList[di].amount, cList[ci].amount);
+    if (transfer > 0.5) {
+      txs.push({ from: dList[di].name, to: cList[ci].name, amount: Math.round(transfer) });
+    }
+    dList[di].amount -= transfer;
+    cList[ci].amount -= transfer;
+    if (dList[di].amount < 0.5) di++;
+    if (cList[ci].amount < 0.5) ci++;
+  }
+
+  txEl.innerHTML = `
+    <div style="font-size:14px;font-weight:600;color:var(--color-text-sub);margin-bottom:var(--space-md);">
+      建議轉帳方式（最少 ${txs.length} 筆）
+    </div>
+    ${txs.map(tx => `
+      <div style="display:flex;align-items:center;gap:var(--space-md);padding:10px var(--space-md);
+                  background:#fff;border:1px solid var(--color-border-light);
+                  border-radius:var(--radius-md);margin-bottom:var(--space-sm);">
+        <span style="font-size:14px;font-weight:600;color:var(--color-accent-red);">${escHtml(tx.from)}</span>
+        <span style="color:var(--color-text-light);font-size:13px;">→ 轉帳</span>
+        <span style="font-size:14px;font-weight:700;color:var(--color-primary);">${fmtMoney(tx.amount)}</span>
+        <span style="color:var(--color-text-light);font-size:13px;">→ 給</span>
+        <span style="font-size:14px;font-weight:600;color:var(--color-success-text);">${escHtml(tx.to)}</span>
+      </div>`).join('')}`;
+}
+
+/* ══════════════════════════════════════
+   修改預算 Modal
+══════════════════════════════════════ */
+function openBudgetModal() {
+  document.getElementById('budget-input').value = tripData.budget || '';
+  document.getElementById('budget-error').style.display = 'none';
+  document.getElementById('budget-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('budget-input').focus(), 50);
+}
+function closeBudgetModal() {
+  document.getElementById('budget-modal').classList.add('hidden');
+}
+function saveBudget() {
+  const val = Number(document.getElementById('budget-input').value);
+  const err = document.getElementById('budget-error');
+  if (isNaN(val) || val < 0) {
+    err.textContent = '⚠ 請輸入有效的預算金額'; err.style.display = 'block'; return;
+  }
+  reload();
+  tripData.budget = val;
+  saveTrip(tripData);
+  closeBudgetModal();
+  renderStats();
+  if (activeTab === 'detail') renderExpenseList();
+  if (activeTab === 'settle') renderSettle();
+  showToast('預算已更新', 'success');
+}
+
+/* ══════════════════════════════════════
+   新增支出 Modal
+══════════════════════════════════════ */
+function openAddExpenseModal() {
+  /* 填入成員下拉 */
+  const members = tripData.members || [];
+  const select  = document.getElementById('exp-paidby');
+  select.innerHTML = members.map(m =>
+    `<option value="${escHtml(m.name)}" ${m.userId === currentUser.id ? 'selected' : ''}>${escHtml(m.name)}</option>`
+  ).join('');
+  if (members.length === 0) {
+    select.innerHTML = `<option value="${escHtml(currentUser.name)}">${escHtml(currentUser.name)}</option>`;
+  }
+
+  document.getElementById('exp-name').value   = '';
+  document.getElementById('exp-amount').value = '';
+  document.getElementById('exp-type').value   = 'food';
+  document.getElementById('exp-error').style.display = 'none';
+  document.getElementById('add-expense-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('exp-name').focus(), 50);
+}
+function closeAddExpenseModal() {
+  document.getElementById('add-expense-modal').classList.add('hidden');
+}
+function addExpense() {
+  const name   = document.getElementById('exp-name').value.trim();
+  const amount = Number(document.getElementById('exp-amount').value);
+  const type   = document.getElementById('exp-type').value;
+  const paidBy = document.getElementById('exp-paidby').value;
+  const err    = document.getElementById('exp-error');
+
+  if (!name)        { err.textContent = '⚠ 請輸入項目名稱'; err.style.display = 'block'; return; }
+  if (!amount || amount <= 0) { err.textContent = '⚠ 請輸入有效金額'; err.style.display = 'block'; return; }
+
+  reload();
+  tripData.expenses = tripData.expenses || [];
+  tripData.expenses.push({
+    id:        generateId(),
+    tripId,
+    name,
+    amount,
+    type,
+    paidBy,
+    createdAt: new Date().toISOString(),
+  });
+
+  saveTrip(tripData);
+  closeAddExpenseModal();
+  renderStats();
+  if (activeTab === 'detail') renderExpenseList();
+  if (activeTab === 'settle') renderSettle();
+  showToast(`已新增「${name}」NT$ ${amount.toLocaleString()}`, 'success');
+}
+
+/* ══════════════════════════════════════
+   刪除支出
+══════════════════════════════════════ */
+function openDeleteExpenseModal(id, name) {
+  deletingExpenseId = id;
+  document.getElementById('delete-expense-name').textContent = name;
+  document.getElementById('delete-expense-modal').classList.remove('hidden');
+}
+function closeDeleteExpenseModal() {
+  document.getElementById('delete-expense-modal').classList.add('hidden');
+  deletingExpenseId = null;
+}
+function confirmDeleteExpense() {
+  if (!deletingExpenseId) return;
+  reload();
+  tripData.expenses = (tripData.expenses||[]).filter(e => e.id !== deletingExpenseId);
+  saveTrip(tripData);
+  closeDeleteExpenseModal();
+  renderStats();
+  if (activeTab === 'detail') renderExpenseList();
+  if (activeTab === 'settle') renderSettle();
+  showToast('支出已刪除', 'error');
+}
+
+/* ══════════════════════════════════════
+   鍵盤 / ESC
+══════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeBudgetModal();
+  closeAddExpenseModal();
+  closeDeleteExpenseModal();
+});
+
+/* ══════════════════════════════════════
+   初始化渲染
+══════════════════════════════════════ */
+renderNav();
+renderFooter();
+renderStats();
+renderExpenseList();
+</script>
 </body>
 </html>

@@ -3,18 +3,537 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent TT — 行程唯讀</title>
+  <title>Agent TT — 行程唯讀分享</title>
   <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    /* ── 唯讀提示橫幅 ── */
+    .readonly-banner {
+      background: var(--color-warning);
+      border-bottom: 1px solid #D4C070;
+      color: var(--color-warning-text);
+      padding: 10px var(--space-xl);
+      font-size: 13px; font-weight: 500;
+      display: flex; align-items: center; gap: var(--space-sm);
+      position: sticky; top: 60px; z-index: 90;
+    }
+
+    /* ── 頁首 ── */
+    .readonly-header {
+      background: #fff;
+      border-bottom: 1px solid var(--color-border-light);
+      padding: var(--space-lg) 0;
+    }
+    .trip-title-row {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: var(--space-md);
+      flex-wrap: wrap; margin-bottom: var(--space-sm);
+    }
+    .trip-main-title { font-size: 22px; font-weight: 700; color: var(--color-text-main); }
+    .trip-meta-row {
+      display: flex; gap: var(--space-lg); flex-wrap: wrap;
+      font-size: 13px; color: var(--color-text-sub);
+    }
+    .trip-meta-item { display: flex; align-items: center; gap: 4px; }
+
+    /* ── Day Tabs ── */
+    .day-tabs-wrap {
+      background: #fff;
+      border-bottom: 2px solid var(--color-border-light);
+      position: sticky; top: calc(60px + 40px); z-index: 75;
+    }
+    .day-tabs-inner {
+      display: flex; align-items: center;
+      gap: 2px; padding: 0 var(--space-xl);
+      overflow-x: auto;
+    }
+    .day-tab {
+      padding: 12px 20px;
+      font-size: 13px; font-weight: 500;
+      color: var(--color-text-sub);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer; white-space: nowrap;
+      background: none; border-top: none; border-left: none; border-right: none;
+      font-family: var(--font-main); flex-shrink: 0;
+      transition: color .15s, border-color .15s;
+    }
+    .day-tab:hover { color: var(--color-primary); }
+    .day-tab.active {
+      color: var(--color-primary); font-weight: 700;
+      border-bottom-color: var(--color-primary);
+    }
+
+    /* ── 主內容 ── */
+    .content-area { padding: var(--space-xl) 0 var(--space-3xl); }
+    .content-inner { display: grid; grid-template-columns: 1fr 300px; gap: var(--space-xl); align-items: start; }
+
+    /* ── 整合卡片 ── */
+    .integrated-card {
+      border-radius: var(--radius-md); padding: 12px 16px;
+      margin-bottom: var(--space-sm); border: 1px solid;
+      display: flex; align-items: center; gap: var(--space-md);
+    }
+    .integrated-card.train {
+      background: #E8F4ED; border-color: #A8D4B8; color: var(--color-success-text);
+    }
+    .integrated-card.hotel {
+      background: #F0E5BC; border-color: #D4C070; color: var(--color-warning-text);
+    }
+    .integrated-icon { font-size: 22px; flex-shrink: 0; }
+    .integrated-info { flex: 1; }
+    .integrated-title { font-size: 13px; font-weight: 700; }
+    .integrated-sub   { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+
+    /* ── 時間軸 ── */
+    .timeline { position: relative; padding-left: 28px; }
+    .timeline::before {
+      content: '';
+      position: absolute; left: 9px; top: 8px;
+      bottom: 8px; width: 2px;
+      background: var(--color-border-light);
+    }
+    .timeline-item {
+      position: relative; margin-bottom: var(--space-md);
+    }
+    .timeline-dot {
+      position: absolute; left: -22px; top: 8px;
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--color-border);
+      background: #fff; flex-shrink: 0;
+    }
+    .timeline-dot.must {
+      background: var(--color-accent-red);
+      border-color: var(--color-accent-red);
+    }
+    .timeline-card {
+      background: #fff; border: 1.5px solid var(--color-border-light);
+      border-radius: var(--radius-md); padding: 12px 14px;
+    }
+    .timeline-card.must { border-left: 3px solid var(--color-accent-red); }
+    .item-name-row {
+      display: flex; align-items: center; gap: var(--space-sm);
+      flex-wrap: wrap; margin-bottom: 4px;
+    }
+    .item-emoji { font-size: 18px; flex-shrink: 0; }
+    .item-name  { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
+    .item-meta  { font-size: 12px; color: var(--color-text-light); display: flex; gap: var(--space-md); flex-wrap: wrap; }
+    .item-note  { font-size: 12px; color: var(--color-text-sub); margin-top: 4px; }
+    .priority-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: var(--radius-xl);
+      font-weight: 500; pointer-events: none;
+    }
+    .priority-badge.must      { background: var(--color-danger); color: var(--color-danger-text); }
+    .priority-badge.candidate { background: #EDEBE4; color: var(--color-text-sub); }
+
+    .day-empty { text-align: center; padding: var(--space-2xl); color: var(--color-text-light); }
+    .day-empty-icon { font-size: 36px; margin-bottom: var(--space-sm); }
+
+    /* ── 右側摘要卡 ── */
+    .summary-card {
+      background: #fff; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg); padding: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+    .summary-title {
+      font-size: 13px; font-weight: 600; color: var(--color-text-sub);
+      letter-spacing: 1px; margin-bottom: var(--space-sm);
+    }
+    .summary-row {
+      display: flex; justify-content: space-between;
+      font-size: 13px; color: var(--color-text-sub);
+      padding: 5px 0; border-bottom: 1px solid #f0ede5;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-val { font-weight: 600; color: var(--color-text-main); }
+
+    /* ── 底部 CTA ── */
+    .cta-block {
+      background: var(--color-primary);
+      border-radius: var(--radius-xl);
+      padding: var(--space-3xl) var(--space-xl);
+      text-align: center; color: #fff;
+      margin-top: var(--space-3xl);
+    }
+    .cta-block h2 { font-size: 22px; font-weight: 700; margin-bottom: var(--space-sm); }
+    .cta-block p  { font-size: 14px; opacity: .85; margin-bottom: var(--space-xl); }
+    .cta-btn {
+      display: inline-block; padding: 12px 36px;
+      background: var(--color-accent-yellow); color: var(--color-text-main);
+      font-size: 15px; font-weight: 700; border-radius: var(--radius-xl);
+      text-decoration: none; transition: opacity .15s;
+    }
+    .cta-btn:hover { opacity: .9; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+      background: #2C4A3E; color: #fff;
+      padding: 10px 24px; border-radius: var(--radius-xl);
+      font-size: 13px; font-weight: 500;
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s;
+      z-index: 9999;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ── 錯誤頁 ── */
+    .not-found {
+      text-align: center; padding: var(--space-3xl) var(--space-xl);
+    }
+    .not-found-icon { font-size: 60px; margin-bottom: var(--space-md); }
+  </style>
 </head>
 <body>
-  <div id="navbar-container"></div>
-  <div id="app"><!-- 頁面內容 --></div>
-  <div id="footer-container"></div>
-  <script src="shared-data.js"></script>
-  <script src="shared-nav.js"></script>
-  <script>
-    renderNav();
-    renderFooter();
-  </script>
+<div id="navbar-container"></div>
+
+<!-- 唯讀提示橫幅 -->
+<div class="readonly-banner" id="readonly-banner" role="alert">
+  <span>👁️</span>
+  <span>你正在以唯讀模式查看此行程，無法進行編輯</span>
+</div>
+
+<div id="app">
+  <!-- 頁首（動態填入） -->
+  <div class="readonly-header" id="trip-header" style="display:none;">
+    <div class="page-container">
+      <div class="trip-title-row">
+        <h1 class="trip-main-title" id="trip-title">載入中…</h1>
+        <div style="display:flex;gap:var(--space-sm);align-items:center;">
+          <button class="btn btn-outline btn-sm" onclick="copyLink()" id="copy-btn">🔗 複製連結</button>
+          <a href="login.html" class="btn btn-primary btn-sm">登入 / 註冊</a>
+        </div>
+      </div>
+      <div class="trip-meta-row" id="trip-meta-row"><!-- 動態填入 --></div>
+    </div>
+  </div>
+
+  <!-- Day Tabs -->
+  <div class="day-tabs-wrap" id="day-tabs-wrap" style="display:none;">
+    <div class="day-tabs-inner" id="day-tabs" role="tablist"><!-- 動態產生 --></div>
+  </div>
+
+  <!-- 主內容 -->
+  <div class="content-area" id="main-content" style="display:none;">
+    <div class="page-container">
+      <div class="content-inner">
+        <!-- 左：時間軸 -->
+        <div>
+          <div id="day-date-label" style="font-size:13px;color:var(--color-text-sub);margin-bottom:var(--space-md);"></div>
+          <div id="integrated-cards"></div>
+          <div id="timeline-list"></div>
+        </div>
+        <!-- 右：摘要 -->
+        <div>
+          <div class="summary-card" id="trip-summary"></div>
+          <div class="summary-card" style="background:var(--color-warning);border-color:#D4C070;">
+            <div class="summary-title" style="color:var(--color-warning-text);">💡 規劃你的旅程</div>
+            <p style="font-size:13px;color:var(--color-warning-text);margin-bottom:var(--space-md);">
+              登入後可複製此行程範本，並依喜好修改、新增旅伴協作！
+            </p>
+            <a href="login.html" class="btn btn-sm btn-full" style="background:var(--color-primary);color:#fff;">立即免費使用</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部 CTA -->
+      <div class="cta-block">
+        <h2>喜歡這個行程嗎？</h2>
+        <p>註冊 Agent TT，規劃你專屬的中彰投小站旅程，支援多人協作、費用分帳、台鐵訂票一站搞定！</p>
+        <a href="login.html" class="cta-btn">立即免費註冊</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 找不到行程 -->
+  <div class="not-found" id="not-found" style="display:none;">
+    <div class="page-container">
+      <div class="not-found-icon">🔍</div>
+      <h2 style="font-size:20px;font-weight:700;margin-bottom:var(--space-sm);">找不到此行程</h2>
+      <p style="color:var(--color-text-light);margin-bottom:var(--space-xl);">行程可能已被刪除或連結已失效</p>
+      <a href="index.html" class="btn btn-primary">回到首頁</a>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div id="footer-container"></div>
+
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+  renderNav();
+  renderFooter();
+
+  /* ── 工具函數 ── */
+  function escHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg, ms = 2000) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), ms);
+  }
+
+  function copyLink() {
+    const url = window.location.href;
+    const btn  = document.getElementById('copy-btn');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        btn.textContent = '✓ 已複製';
+        btn.classList.add('btn-primary');
+        btn.classList.remove('btn-outline');
+        showToast('✓ 連結已複製到剪貼簿');
+        setTimeout(() => {
+          btn.textContent = '🔗 複製連結';
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-outline');
+        }, 2500);
+      }).catch(fallback);
+    } else {
+      fallback();
+    }
+    function fallback() {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✓ 已複製';
+        showToast('✓ 連結已複製到剪貼簿');
+        setTimeout(() => { btn.textContent = '🔗 複製連結'; }, 2500);
+      } catch(e) {
+        showToast('請手動複製網址列');
+      }
+    }
+  }
+
+  /* ── 資料 ── */
+  const params   = new URLSearchParams(window.location.search);
+  const tripId   = params.get('id');
+  let   tripData = null;
+  let   activeDay = 1;
+
+  /* ── 初始化 ── */
+  function init() {
+    if (!tripId) { showNotFound(); return; }
+    tripData = getTripById(tripId);
+    if (!tripData) { showNotFound(); return; }
+
+    document.title = `Agent TT — ${tripData.name}（唯讀）`;
+    renderHeader();
+    renderTabs();
+    renderDay(1);
+
+    document.getElementById('trip-header').style.display = '';
+    document.getElementById('day-tabs-wrap').style.display = '';
+    document.getElementById('main-content').style.display = '';
+  }
+
+  function showNotFound() {
+    document.getElementById('readonly-banner').style.display = 'none';
+    document.getElementById('not-found').style.display = '';
+  }
+
+  /* ── 頁首 ── */
+  function renderHeader() {
+    document.getElementById('trip-title').textContent = tripData.name;
+
+    const start = tripData.startDate ? new Date(tripData.startDate + 'T00:00:00') : null;
+    const end   = tripData.endDate   ? new Date(tripData.endDate   + 'T00:00:00') : null;
+    const days  = (start && end) ? Math.round((end - start) / 86400000) + 1 : 1;
+    const spent = (tripData.expenses || []).reduce((s, e) => s + Number(e.amount), 0);
+
+    const fmt = d => d ? `${d.getMonth()+1}/${d.getDate()}` : '—';
+    const fmtFull = d => d ? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}` : '—';
+
+    document.getElementById('trip-meta-row').innerHTML = `
+      <span class="trip-meta-item">📍 ${escHtml(tripData.station || '未設定車站')}</span>
+      <span class="trip-meta-item">📅 ${fmtFull(start)} — ${fmtFull(end)}（${days} 天）</span>
+      <span class="trip-meta-item">👥 ${(tripData.members || []).length} 人</span>
+      ${spent > 0 ? `<span class="trip-meta-item">💰 預估花費 NT$ ${spent.toLocaleString()}</span>` : ''}
+    `;
+
+    /* 右側摘要卡 */
+    const budget  = Number(tripData.budget) || 0;
+    const items   = tripData.items || [];
+    const mustCnt = items.filter(i => i.priority === 'must').length;
+    document.getElementById('trip-summary').innerHTML = `
+      <div class="summary-title">行程摘要</div>
+      <div class="summary-row"><span>出發車站</span><span class="summary-val">${escHtml(tripData.station || '未設定')}</span></div>
+      <div class="summary-row"><span>旅遊天數</span><span class="summary-val">${days} 天</span></div>
+      <div class="summary-row"><span>同行人數</span><span class="summary-val">${(tripData.members||[]).length} 人</span></div>
+      <div class="summary-row"><span>景點行程</span><span class="summary-val">${items.length} 個（必去 ${mustCnt}）</span></div>
+      ${budget > 0 ? `<div class="summary-row"><span>旅遊預算</span><span class="summary-val">NT$ ${budget.toLocaleString()}</span></div>` : ''}
+      ${spent > 0  ? `<div class="summary-row"><span>預估花費</span><span class="summary-val">NT$ ${spent.toLocaleString()}</span></div>` : ''}
+    `;
+  }
+
+  /* ── Day Tabs ── */
+  function renderTabs() {
+    const start = tripData.startDate ? new Date(tripData.startDate + 'T00:00:00') : null;
+    const end   = tripData.endDate   ? new Date(tripData.endDate   + 'T00:00:00') : null;
+    const days  = (start && end) ? Math.round((end - start) / 86400000) + 1 : 1;
+
+    const container = document.getElementById('day-tabs');
+    container.innerHTML = '';
+    for (let d = 1; d <= days; d++) {
+      const btn = document.createElement('button');
+      btn.className = 'day-tab' + (d === 1 ? ' active' : '');
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', d === 1 ? 'true' : 'false');
+      btn.textContent = `Day ${d}`;
+      btn.dataset.day = d;
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.day-tab').forEach(t => {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+        renderDay(d);
+      });
+      container.appendChild(btn);
+    }
+  }
+
+  /* ── 渲染單日 ── */
+  function renderDay(day) {
+    activeDay = day;
+
+    const start = tripData.startDate ? new Date(tripData.startDate + 'T00:00:00') : null;
+    let dateLabelHtml = '';
+    if (start) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + day - 1);
+      const weekdays = ['日','一','二','三','四','五','六'];
+      dateLabelHtml = `Day ${day}・${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}（週${weekdays[d.getDay()]}）`;
+    }
+    document.getElementById('day-date-label').textContent = dateLabelHtml;
+
+    renderIntegrated(day);
+    renderTimeline(day);
+  }
+
+  /* ── 整合卡片（台鐵/住宿） ── */
+  function renderIntegrated(day) {
+    const start = tripData.startDate ? new Date(tripData.startDate + 'T00:00:00') : null;
+    let dateStr = '';
+    if (start) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + day - 1);
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      dateStr = `${d.getFullYear()}-${m}-${dd}`;
+    }
+
+    const tickets  = (tripData.tickets  || []).filter(t => t.date === dateStr);
+    const bookings = (tripData.bookings || []).filter(b => b.checkIn === dateStr);
+    let html = '';
+
+    /* 依 orderId 分組顯示台鐵票 */
+    const orderMap = {};
+    tickets.forEach(t => {
+      if (!orderMap[t.orderId]) orderMap[t.orderId] = [];
+      orderMap[t.orderId].push(t);
+    });
+    Object.values(orderMap).forEach(grp => {
+      const first = grp[0];
+      const last  = grp[grp.length - 1];
+      html += `
+        <div class="integrated-card train">
+          <div class="integrated-icon">🚂</div>
+          <div class="integrated-info">
+            <div class="integrated-title">台鐵車票　${escHtml(first.fromStation)} → ${escHtml(last.toStation)}</div>
+            <div class="integrated-sub">${escHtml(first.trainType || '')} ${escHtml(first.trainNo || '')}　${escHtml(first.departTime || '—')} 出發，${escHtml(last.arriveTime || '—')} 抵達</div>
+          </div>
+        </div>`;
+    });
+
+    bookings.forEach(b => {
+      html += `
+        <div class="integrated-card hotel">
+          <div class="integrated-icon">🏨</div>
+          <div class="integrated-info">
+            <div class="integrated-title">住宿　${escHtml(b.propertyName || '訂房')}</div>
+            <div class="integrated-sub">Check-in ${escHtml(b.checkIn || '—')}　共 ${b.nights || 1} 晚</div>
+          </div>
+        </div>`;
+    });
+
+    document.getElementById('integrated-cards').innerHTML = html;
+  }
+
+  /* ── 時間軸 ── */
+  function typeEmoji(type) {
+    const map = { attraction:'🏛', restaurant:'🍽', activity:'🎯', hotel:'🏨', train:'🚂' };
+    return map[type] || '📍';
+  }
+  function typeName(type) {
+    const map = { attraction:'景點', restaurant:'餐廳', activity:'活動', hotel:'住宿', train:'車票' };
+    return map[type] || type;
+  }
+
+  function renderTimeline(day) {
+    const items = (tripData.items || [])
+      .filter(i => Number(i.day) === day)
+      .sort((a, b) => {
+        if (a.time && b.time) return a.time.localeCompare(b.time);
+        return (a.order || 0) - (b.order || 0);
+      });
+
+    const container = document.getElementById('timeline-list');
+    if (!items.length) {
+      container.innerHTML = `
+        <div class="day-empty">
+          <div class="day-empty-icon">🗺️</div>
+          <p>此日尚無行程項目</p>
+        </div>`;
+      return;
+    }
+
+    const html = `<div class="timeline">` + items.map(item => {
+      const isMust    = item.priority === 'must';
+      const dotClass  = isMust ? 'timeline-dot must' : 'timeline-dot';
+      const cardClass = isMust ? 'timeline-card must' : 'timeline-card';
+      const timeHtml  = item.time
+        ? `<span>🕐 ${escHtml(item.time)}${item.endTime ? ' – ' + escHtml(item.endTime) : ''}</span>`
+        : '';
+      const typeHtml  = `<span>${escHtml(typeName(item.type))}</span>`;
+      const linkedHtml = (item.linkedTicketId || item.linkedBookingId)
+        ? `<span style="color:var(--color-success-text);background:var(--color-success);padding:1px 6px;border-radius:var(--radius-sm);font-size:11px;">已整合</span>`
+        : '';
+      return `
+        <div class="timeline-item">
+          <div class="${dotClass}"></div>
+          <div class="${cardClass}">
+            <div class="item-name-row">
+              <span class="item-emoji">${typeEmoji(item.type)}</span>
+              <span class="item-name">${escHtml(item.name)}</span>
+              <span class="priority-badge ${isMust ? 'must' : 'candidate'}">${isMust ? '必去' : '候選'}</span>
+              ${linkedHtml}
+            </div>
+            <div class="item-meta">
+              ${timeHtml}
+              ${typeHtml}
+            </div>
+            ${item.note ? `<div class="item-note">📝 ${escHtml(item.note)}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('') + `</div>`;
+
+    container.innerHTML = html;
+  }
+
+  init();
+</script>
 </body>
 </html>
