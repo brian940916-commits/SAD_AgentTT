@@ -414,7 +414,10 @@ function getDayCount(trip) {
 function getDateForDay(day) {
   const d = new Date(tripData.startDate + 'T00:00:00');
   d.setDate(d.getDate() + day - 1);
-  return d.toISOString().slice(0, 10);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function fmtDate(iso) {
@@ -561,7 +564,10 @@ function switchDay(day) {
 function addDay() {
   const end = new Date(tripData.endDate + 'T00:00:00');
   end.setDate(end.getDate() + 1);
-  tripData.endDate = end.toISOString().slice(0, 10);
+  const yyyy = end.getFullYear();
+  const mm = String(end.getMonth() + 1).padStart(2, '0');
+  const dd = String(end.getDate()).padStart(2, '0');
+  tripData.endDate = `${yyyy}-${mm}-${dd}`;
   saveTrip(tripData);
   renderDayTabs();
   switchDay(getDayCount(tripData));
