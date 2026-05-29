@@ -375,7 +375,34 @@
       .train-card .train-duration { display: none; }
       .train-card .train-price-col { text-align: left; font-size: 16px; }
       .train-card .book-btn { grid-column: 1 / -1; }
+      .stops-row { flex-wrap: wrap; gap: 4px; }
     }
+
+    /* ── 列車狀態標籤 ── */
+    .train-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-top: 5px; display: inline-block; }
+    .status-ontime  { background: #E8F5E9; color: #2E7D32; }
+    .status-delayed { background: #FFF3E0; color: #E65100; }
+    .status-passed  { background: #EEEEEE; color: #757575; }
+
+    /* ── 剩餘座位 ── */
+    .seats-info { font-size: 12px; color: var(--color-text-sub); margin-top: 4px; }
+    .seats-info.warn { color: #C4514A; font-weight: 700; }
+
+    /* ── 停靠站展開列 ── */
+    .train-card-outer { margin-bottom: 10px; }
+    .train-card-outer .train-card { margin-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .stops-row {
+      background: #F7F5F0; border: 1.5px solid var(--color-border-light); border-top: 1px solid #E8E3D4;
+      padding: 6px 20px; display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none;
+    }
+    .stops-row:not(.open-row) { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+    .stops-row.open-row { border-bottom: none; }
+    .stops-toggle-btn { font-size: 12px; color: var(--color-primary); background: none; border: none; font-family: var(--font-main); cursor: pointer; padding: 0; }
+    .stops-panel { display: none; border: 1.5px solid var(--color-border-light); border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: #fff; padding: 10px 20px 14px; }
+    .stops-panel.open { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+    .stop-item { font-size: 13px; color: var(--color-text-main); }
+    .stop-sep  { font-size: 11px; color: var(--color-text-light); }
   </style>
 </head>
 <body>
@@ -796,32 +823,94 @@ function comboCardHTML(combo, from, to, date) {
     </div>`;
 }
 
+/* ── 假資料：列車狀態 & 剩餘座位 ── */
+function hashNum(str) {
+  var h = 0;
+  for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0xfffff;
+  return h;
+}
+function getTrainStatus(trainNo, dH, dM) {
+  const now  = new Date();
+  const nowM = now.getHours() * 60 + now.getMinutes();
+  if (dH * 60 + dM < nowM) return { label:'已過站', cls:'status-passed', passed:true };
+  const h = hashNum(trainNo);
+  if (h % 5 === 0) return { label:'誤點 ' + ((h % 3 + 1) * 5) + ' 分', cls:'status-delayed', passed:false };
+  return { label:'準點', cls:'status-ontime', passed:false };
+}
+function getSeatsNum(trainNo) { return (hashNum(trainNo) % 56) + 5; }
+function seatsHTML(trainNo) {
+  const n = getSeatsNum(trainNo);
+  return n < 10
+    ? `<div class="seats-info warn">剩餘 ${n} 座</div>`
+    : `<div class="seats-info">剩餘 ${n} 座</div>`;
+}
+
+/* ── 停靠站資料 ── */
+const JIJI_STOPS  = ['二水','源泉','濁水','龍泉','集集','水里','車埕'];
+const WEST_STOPS  = {
+  express: ['彰化','員林','二水'],
+  juguang: ['彰化','員林','二水'],
+  local:   ['彰化','花壇','大村','員林','永靖','社頭','田中','二水'],
+};
+function stopsListHTML(stops) {
+  return stops.map((s, i) =>
+    i < stops.length - 1
+      ? `<span class="stop-item">${escHtml(s)}</span><span class="stop-sep"> → </span>`
+      : `<span class="stop-item">${escHtml(s)}</span>`
+  ).join('');
+}
+var _stopsOpen = {};
+function toggleStops(sid) {
+  var panel = document.getElementById('sp-' + sid);
+  var row   = document.getElementById('sr-' + sid);
+  var btn   = document.getElementById('sb-' + sid);
+  if (!panel) return;
+  _stopsOpen[sid] = !_stopsOpen[sid];
+  panel.classList.toggle('open', _stopsOpen[sid]);
+  row.classList.toggle('open-row', _stopsOpen[sid]);
+  btn.textContent = _stopsOpen[sid] ? '▲ 收起' : '▼ 查看停靠站';
+}
+
 function jijiCardHTML(t, from, to, date) {
-  const price = typeof t.price === 'object' ? (t.price[to] || 113) : 113;
+  const price  = typeof t.price === 'object' ? (t.price[to] || 113) : 113;
   const params = new URLSearchParams({
     from, to, date,
     trainNo1: t.trainNo, depart1: t.depart, arrive1: t.arrive, price1: price,
     trainType1: '普快車', total: price
   });
+  const [dH, dM] = t.depart.split(':').map(Number);
+  const st  = getTrainStatus(t.trainNo, dH, dM);
+  const sid = 'j' + t.trainNo;
+  const bookBtn = st.passed
+    ? `<button class="book-btn" disabled style="opacity:.45;cursor:not-allowed;">已過站</button>`
+    : `<button class="book-btn" onclick="window.location.href='train-booking.html?${params.toString()}'">訂票</button>`;
   return `
-    <div class="train-card">
-      <div>
-        <div class="train-type-badge type-pukuai">普快車</div>
-        <div class="train-no">${escHtml(t.trainNo)}</div>
+    <div class="train-card-outer">
+      <div class="train-card">
+        <div>
+          <div class="train-type-badge type-pukuai">普快車</div>
+          <div class="train-no">${escHtml(t.trainNo)}</div>
+          <span class="train-status ${st.cls}">${st.label}</span>
+        </div>
+        <div class="train-time-col">
+          <span class="train-time">${escHtml(t.depart)}</span>
+          <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          <span class="train-time">${escHtml(t.arrive)}</span>
+        </div>
+        <div class="train-duration">約 28 分</div>
+        <div class="train-price-col">NT$${price}<br><small>/人</small>${seatsHTML(t.trainNo)}</div>
+        ${bookBtn}
       </div>
-      <div class="train-time-col">
-        <span class="train-time">${escHtml(t.depart)}</span>
-        <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-        <span class="train-time">${escHtml(t.arrive)}</span>
+      <div class="stops-row" id="sr-${sid}" onclick="toggleStops('${sid}')">
+        <span style="font-size:12px;color:var(--color-text-sub);">集集線全線停靠站</span>
+        <button class="stops-toggle-btn" id="sb-${sid}">▼ 查看停靠站</button>
       </div>
-      <div class="train-duration">約 28 分</div>
-      <div class="train-price-col">NT$${price}<br><small>/人</small></div>
-      <button class="book-btn" onclick="window.location.href='train-booking.html?${params.toString()}'">訂票</button>
+      <div class="stops-panel" id="sp-${sid}">${stopsListHTML(JIJI_STOPS)}</div>
     </div>`;
 }
 
 function directCardHTML(t, from, to, date) {
-  const arrive = addMinutes(t.departH, t.departM, t.durationMin);
+  const arrive    = addMinutes(t.departH, t.departM, t.durationMin);
   const departStr = fmtTime(t.departH, t.departM);
   const arriveStr = fmtTime(arrive.h, arrive.m);
   const params = new URLSearchParams({
@@ -829,20 +918,34 @@ function directCardHTML(t, from, to, date) {
     trainNo1: t.trainNo, depart1: departStr, arrive1: arriveStr, price1: t.price,
     trainType1: t.type, total: t.price
   });
+  const st    = getTrainStatus(t.trainNo, t.departH, t.departM);
+  const stops = WEST_STOPS[t.typeKey] || WEST_STOPS.local;
+  const sid   = 'd' + t.trainNo;
+  const bookBtn = st.passed
+    ? `<button class="book-btn" disabled style="opacity:.45;cursor:not-allowed;">已過站</button>`
+    : `<button class="book-btn" onclick="window.location.href='train-booking.html?${params.toString()}'">訂票</button>`;
   return `
-    <div class="train-card">
-      <div>
-        ${typeBadgeHTML(t.type, t.typeKey)}
-        <div class="train-no">${escHtml(t.trainNo)}</div>
+    <div class="train-card-outer">
+      <div class="train-card">
+        <div>
+          ${typeBadgeHTML(t.type, t.typeKey)}
+          <div class="train-no">${escHtml(t.trainNo)}</div>
+          <span class="train-status ${st.cls}">${st.label}</span>
+        </div>
+        <div class="train-time-col">
+          <span class="train-time">${escHtml(departStr)}</span>
+          <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          <span class="train-time">${escHtml(arriveStr)}</span>
+        </div>
+        <div class="train-duration">約 ${t.durationMin} 分</div>
+        <div class="train-price-col">NT$${t.price}<br><small>/人</small>${seatsHTML(t.trainNo)}</div>
+        ${bookBtn}
       </div>
-      <div class="train-time-col">
-        <span class="train-time">${escHtml(departStr)}</span>
-        <svg width="18" height="12" viewBox="0 0 24 12"><path d="M0 6h20m-4-4l4 4-4 4" stroke="#8A8073" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-        <span class="train-time">${escHtml(arriveStr)}</span>
+      <div class="stops-row" id="sr-${sid}" onclick="toggleStops('${sid}')">
+        <span style="font-size:12px;color:var(--color-text-sub);">縱貫線停靠站</span>
+        <button class="stops-toggle-btn" id="sb-${sid}">▼ 查看停靠站</button>
       </div>
-      <div class="train-duration">約 ${t.durationMin} 分</div>
-      <div class="train-price-col">NT$${t.price}<br><small>/人</small></div>
-      <button class="book-btn" onclick="window.location.href='train-booking.html?${params.toString()}'">訂票</button>
+      <div class="stops-panel" id="sp-${sid}">${stopsListHTML(stops)}</div>
     </div>`;
 }
 

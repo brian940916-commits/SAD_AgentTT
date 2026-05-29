@@ -267,14 +267,31 @@ function ticketCardHTML(t) {
   const statusCls = STATUS_CLASS[t.status] || 'status-unused';
   const typeCls   = TYPE_CLASS[t.ticketType] || 'tag-general';
 
+  // 取票方式標籤及 QR 邏輯
+  const pickup = t.pickupMethod || 'qr';
+  const PICKUP_LABEL = { qr:'QR Code 電子票證', store:'超商取票', station:'車站取票' };
+  const pickupNotice = pickup === 'store'
+    ? `<span style="font-size:12px;color:#E65100;background:#FFF3E0;padding:3px 10px;border-radius:20px;">🏪 請至超商取票</span>`
+    : pickup === 'station'
+    ? `<span style="font-size:12px;color:#1565C0;background:#E3F2FD;padding:3px 10px;border-radius:20px;">🏛️ 請至車站取票</span>`
+    : '';
+
   // 動作按鈕
   let actions = '';
   if (isActive) {
-    actions += `<button class="act-btn act-btn-primary" onclick="showQR('${escHtml(t.id)}')">顯示 QR Code</button>`;
+    if (pickup === 'qr') {
+      actions += `<button class="act-btn act-btn-primary" onclick="showQR('${escHtml(t.id)}')">顯示 QR Code</button>`;
+    } else {
+      actions += pickupNotice;
+    }
     actions += `<button class="act-btn act-btn-outline" onclick="showSplit('${escHtml(t.id)}')">分票</button>`;
     actions += `<button class="act-btn act-btn-danger" onclick="window.location.href='train-refund.html?ticketId=${escHtml(t.id)}'">退票</button>`;
   } else if (!isRefunded && !isSplit) {
-    actions += `<button class="act-btn act-btn-outline" onclick="showQR('${escHtml(t.id)}')">查看 QR</button>`;
+    if (pickup === 'qr') {
+      actions += `<button class="act-btn act-btn-outline" onclick="showQR('${escHtml(t.id)}')">查看 QR</button>`;
+    } else {
+      actions += pickupNotice;
+    }
   }
 
   const dateStr = t.date || '—';
