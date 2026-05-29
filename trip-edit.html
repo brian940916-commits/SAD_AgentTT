@@ -559,13 +559,10 @@ function switchDay(day) {
 }
 
 function addDay() {
-  // 延長 endDate 一天
   const end = new Date(tripData.endDate + 'T00:00:00');
   end.setDate(end.getDate() + 1);
   tripData.endDate = end.toISOString().slice(0, 10);
-  addLog('延長行程', `新增 Day ${getDayCount(tripData)}（${tripData.endDate}）`);
   saveTrip(tripData);
-  renderHeader();
   renderDayTabs();
   switchDay(getDayCount(tripData));
   showToast('已新增一天', 'success');
