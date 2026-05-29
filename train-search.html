@@ -403,6 +403,21 @@
     .stops-panel.open { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
     .stop-item { font-size: 13px; color: var(--color-text-main); }
     .stop-sep  { font-size: 11px; color: var(--color-text-light); }
+
+    /* ── 最優惠票種建議 ── */
+    .suggest-banner {
+      background: #E8F4ED; border: 1.5px solid #A8D4B8; border-radius: var(--radius-lg);
+      padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px;
+      margin-bottom: 16px;
+    }
+    .suggest-icon { font-size: 22px; line-height: 1.2; flex-shrink: 0; }
+    .suggest-title { font-size: 13px; font-weight: 700; color: var(--color-primary); margin-bottom: 4px; }
+    .suggest-text { font-size: 13px; color: #2C6B4A; }
+    .suggest-discount {
+      background: var(--color-primary); color: #fff;
+      font-size: 11px; font-weight: 700; padding: 1px 7px;
+      border-radius: 12px; margin-left: 6px; vertical-align: middle;
+    }
   </style>
 </head>
 <body>
@@ -469,6 +484,7 @@
 <!-- ── 結果區 ── -->
 <div class="main-wrap">
   <div class="results-wrap">
+    <div id="suggestion-area" style="display:none;"></div>
     <div id="results-area">
       <div class="wait-hint">
         <div class="icon">🛤️</div>
@@ -657,18 +673,19 @@ function searchTrains() {
   if (isJijiDest(to)) {
     if (!allowTransfer && from !== '二水') {
       area.innerHTML = emptyHTML('已關閉「允許轉乘」，此路線需在二水站轉乘，無法顯示結果');
-      return;
+    } else {
+      renderJijiResults(from, to, date, afterMins, area);
     }
-    renderJijiResults(from, to, date, afterMins, area);
   } else if (isJijiDest(from)) {
     if (!allowTransfer) {
       area.innerHTML = emptyHTML('已關閉「允許轉乘」，此路線需在二水站轉乘，無法顯示結果');
-      return;
+    } else {
+      renderJijiReverseResults(from, to, date, afterMins, area);
     }
-    renderJijiReverseResults(from, to, date, afterMins, area);
   } else {
     renderDirectResults(from, to, date, afterMins, area);
   }
+  showTicketSuggestion();
 }
 
 /* 集集線（正向：一般站 → 集集線）*/
@@ -947,6 +964,58 @@ function directCardHTML(t, from, to, date) {
       </div>
       <div class="stops-panel" id="sp-${sid}">${stopsListHTML(stops)}</div>
     </div>`;
+}
+
+function showTicketSuggestion() {
+  const area = document.getElementById('suggestion-area');
+  if (!area) return;
+
+  var suggestName = '一般票';
+  var suggestDiscount = '';
+  var suggestReason = '適合一般旅客，無需出示任何證件';
+
+  if (typeof getCurrentUser === 'function') {
+    var user = getCurrentUser();
+    if (user && typeof getTicketsByUser === 'function') {
+      var tickets = getTicketsByUser(user.id);
+      if (tickets.length) {
+        var counts = {};
+        tickets.forEach(function(t) {
+          if (t.ticketType && t.ticketType !== 'general') {
+            counts[t.ticketType] = (counts[t.ticketType] || 0) + 1;
+          }
+        });
+        var sorted = Object.entries(counts).sort(function(a, b) { return b[1] - a[1]; });
+        if (sorted.length) {
+          var typeMap = {
+            student:  { name:'學生票', discount:'88折', reason:'依您過往搭乘紀錄，建議使用學生票（需出示學生證）' },
+            senior:   { name:'敬老票', discount:'5折',  reason:'依您過往搭乘紀錄，建議使用敬老票（65歲以上）' },
+            disabled: { name:'愛心票', discount:'60折', reason:'依您過往搭乘紀錄，建議使用愛心票（需出示身心障礙手冊）' },
+            child:    { name:'兒童票', discount:'7折',  reason:'依您過往搭乘紀錄，建議使用兒童票（未滿12歲）' },
+          };
+          var best = sorted[0][0];
+          if (typeMap[best]) {
+            suggestName     = typeMap[best].name;
+            suggestDiscount = typeMap[best].discount;
+            suggestReason   = typeMap[best].reason;
+          }
+        }
+      }
+    }
+  }
+
+  var discTag = suggestDiscount
+    ? '<span class="suggest-discount">' + escHtml(suggestDiscount) + '</span>'
+    : '';
+  area.innerHTML =
+    '<div class="suggest-banner">' +
+    '<div class="suggest-icon">💡</div>' +
+    '<div>' +
+    '<div class="suggest-title">自動篩選最優惠票種</div>' +
+    '<div class="suggest-text">建議選用 <strong>' + escHtml(suggestName) + '</strong>' + discTag + '　' + escHtml(suggestReason) + '</div>' +
+    '</div>' +
+    '</div>';
+  area.style.display = 'block';
 }
 
 function emptyHTML(msg) {
