@@ -173,6 +173,16 @@
     .day-empty { text-align: center; padding: var(--space-2xl) var(--space-lg); color: var(--color-text-light); }
     .day-empty-icon { font-size: 36px; margin-bottom: var(--space-sm); }
 
+    /* ── 跨日拖曳目標 ── */
+    .day-tab.drop-target {
+      background: rgba(76, 175, 80, 0.13);
+      border-bottom-color: #4CAF50 !important;
+      color: var(--color-primary);
+      outline: 2px solid rgba(76,175,80,0.45);
+      outline-offset: -2px;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    }
+
     @media (max-width: 768px) {
       .edit-header { position: static; }
       .day-tabs-wrap { position: static; }
@@ -528,8 +538,12 @@ function renderDayTabs() {
     const dateStr = fmtDate(getDateForDay(i));
     html += `
       <button class="day-tab${i === currentDay ? ' active' : ''}"
+              data-day="${i}"
               role="tab" aria-selected="${i===currentDay}"
-              onclick="switchDay(${i})">
+              onclick="switchDay(${i})"
+              ondragover="onDayTabDragOver(event,${i})"
+              ondragleave="onDayTabDragLeave(event,${i})"
+              ondrop="onDayTabDrop(event,${i})">
         Day ${i} <span style="font-weight:400;opacity:0.7;font-size:11px;margin-left:4px;">${dateStr}</span>
       </button>`;
   }
@@ -745,10 +759,55 @@ function onDropZone(e) {
   e.preventDefault();
 }
 
+/* ── 跨日拖曳：Day Tab 作為放置區 ── */
+function onDayTabDragOver(e, targetDay) {
+  if (!dragSrcId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (targetDay === currentDay) return;
+  // 只高亮目標 tab，清除其他
+  document.querySelectorAll('.day-tab').forEach(t => {
+    t.classList.toggle('drop-target',
+      parseInt(t.dataset.day, 10) === targetDay);
+  });
+}
+
+function onDayTabDragLeave(e, targetDay) {
+  // 只在真正離開 tab 時取消（移往子元素觸發的 leave 要忽略）
+  if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+  document.querySelector(`.day-tab[data-day="${targetDay}"]`)
+    ?.classList.remove('drop-target');
+}
+
+function onDayTabDrop(e, targetDay) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('drop-target'));
+
+  if (!dragSrcId || targetDay === currentDay) return;
+
+  const item = (tripData.items || []).find(i => i.id === dragSrcId);
+  if (!item) return;
+
+  const prevDay = item.day;
+  item.day = targetDay;
+
+  // 移到目標天的末尾
+  const targetItems = (tripData.items || []).filter(i => i.day === targetDay);
+  item.order = targetItems.reduce((m, i) => Math.max(m, i.order), 0) + 1;
+
+  addLog('移動項目', `將「${item.name}」從 Day ${prevDay} 移到 Day ${targetDay}`);
+  saveTrip(tripData);
+  renderDayContent(currentDay);
+  showToast(`已移動到 Day ${targetDay}`, 'success');
+  dragSrcId = null;
+}
+
 function onDragEnd(e) {
   document.querySelectorAll('.item-card').forEach(c => {
     c.classList.remove('dragging', 'drag-over');
   });
+  document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('drop-target'));
   dragSrcId = null;
 }
 
