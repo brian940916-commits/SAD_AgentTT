@@ -414,13 +414,12 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
       進階篩選
     </button>
-    <span style="font-size:12px;color:var(--color-text-light);">直達或轉乘、車種、座位偏好</span>
+    <span style="font-size:12px;color:var(--color-text-light);">轉乘、車種、座位偏好</span>
   </div>
   <div class="adv-panel" id="adv-panel" style="max-width:1000px;margin:0 auto;">
     <div class="adv-grid">
       <div class="adv-group">
         <label class="group-label">乘車方式</label>
-        <label class="check-row"><input type="checkbox" id="pref-direct" checked> 直達車</label>
         <label class="check-row"><input type="checkbox" id="pref-transfer" checked> 允許轉乘</label>
       </div>
       <div class="adv-group">
@@ -432,9 +431,9 @@
       </div>
       <div class="adv-group">
         <label class="group-label">座位偏好</label>
-        <label class="check-row"><input type="checkbox" id="seat-window" checked> 靠窗</label>
-        <label class="check-row"><input type="checkbox" id="seat-aisle"> 靠走道</label>
-        <label class="check-row"><input type="checkbox" id="seat-any" checked> 無偏好</label>
+        <label class="check-row"><input type="radio" name="seat-pref" id="seat-window" checked> 靠窗</label>
+        <label class="check-row"><input type="radio" name="seat-pref" id="seat-aisle"> 靠走道</label>
+        <label class="check-row"><input type="radio" name="seat-pref" id="seat-any"> 無偏好</label>
       </div>
     </div>
   </div>
@@ -624,12 +623,21 @@ function searchTrains() {
     return;
   }
 
-  const afterMins = timeToMins(timeStr);
+  const afterMins   = timeToMins(timeStr);
+  const allowTransfer = document.getElementById('pref-transfer').checked;
   const area = document.getElementById('results-area');
 
   if (isJijiDest(to)) {
+    if (!allowTransfer && from !== '二水') {
+      area.innerHTML = emptyHTML('已關閉「允許轉乘」，此路線需在二水站轉乘，無法顯示結果');
+      return;
+    }
     renderJijiResults(from, to, date, afterMins, area);
   } else if (isJijiDest(from)) {
+    if (!allowTransfer) {
+      area.innerHTML = emptyHTML('已關閉「允許轉乘」，此路線需在二水站轉乘，無法顯示結果');
+      return;
+    }
     renderJijiReverseResults(from, to, date, afterMins, area);
   } else {
     renderDirectResults(from, to, date, afterMins, area);

@@ -140,6 +140,13 @@
 
     /* 轉乘標籤 */
     .transfer-tag { font-size: 11px; background: #FFF8E6; color: #7A5A1A; border: 1px solid #E8C547; padding: 2px 8px; border-radius: 20px; }
+
+    @media (max-width: 768px) {
+      .filter-tabs { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+      .ticket-card-body { grid-template-columns: 1fr; gap: 10px; }
+      .ticket-right { flex-direction: row; align-items: center; justify-content: space-between; }
+      .ticket-card-foot { flex-direction: column; align-items: flex-start; }
+    }
   </style>
 </head>
 <body>
@@ -194,7 +201,8 @@
     </div>
     <div id="split-method-label-wrap">
       <label class="modal-form-label" id="split-method-label">收件人手機號碼</label>
-      <input class="modal-input" id="split-recipient" placeholder="0912345678"/>
+      <input class="modal-input" id="split-recipient" placeholder="0912345678" oninput="document.getElementById('split-error').style.display='none'"/>
+      <div id="split-error" style="display:none;font-size:12px;color:#C4514A;margin-top:6px;"></div>
     </div>
     <div class="modal-btn-row">
       <button class="btn-cancel" onclick="closeModal('split-modal')">取消</button>
@@ -396,9 +404,28 @@ function setSplitMethod(method, el) {
   document.getElementById('split-recipient').placeholder = placeholders[method] || '';
 }
 
+function findUserByEmail(email) {
+  const users = JSON.parse(localStorage.getItem('agenttt_users') || '[]');
+  return users.find(u => u.email === email) || null;
+}
+
 function confirmSplit() {
   const recipient = document.getElementById('split-recipient').value.trim();
   if (!recipient) { alert('請填寫收件人資訊'); return; }
+
+  if (splitMethod === 'platform') {
+    const found = findUserByEmail(recipient);
+    if (!found) {
+      const errEl = document.getElementById('split-error');
+      if (errEl) {
+        errEl.textContent = '找不到此帳號';
+        errEl.style.display = 'block';
+      } else {
+        alert('找不到此帳號');
+      }
+      return;
+    }
+  }
 
   const ticket = getTicketById(splitTargetId);
   if (!ticket) return;
