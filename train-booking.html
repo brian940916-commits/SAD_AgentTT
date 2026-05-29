@@ -157,6 +157,18 @@
     .btn-skip { background: var(--color-bg); border: 1px solid var(--color-border) !important; color: var(--color-text-sub); }
     .btn-link { background: var(--color-primary); color: #fff; }
 
+    /* ── 時間制折扣 ── */
+    .time-disc-banner { border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .time-disc-urgent { background: #FFF3E0; color: #E65100; border: 1px solid #FFB74D; }
+    .time-disc-hot    { background: #FFF8E6; color: #B07800; border: 1px solid #E8C547; }
+    .time-disc-warm   { background: #E8F4ED; color: #2C6B4A; border: 1px solid #A8D4B8; }
+    .time-disc-mild   { background: #EEF5E9; color: #3D7A3D; border: 1px solid #B8D4AA; }
+
+    /* ── 替代座位 ── */
+    .alt-seat-row { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; cursor: pointer; font-size: 13px; color: var(--color-text-sub); }
+    .alt-seat-row input { accent-color: var(--color-primary); margin-top: 2px; flex-shrink: 0; }
+    .alt-seat-note { font-size: 11px; color: var(--color-text-light); margin-top: 3px; }
+
     @media (max-width: 768px) {
       .booking-wrap { grid-template-columns: 1fr; padding: 20px 16px 40px; }
       .order-summary { position: static; }
@@ -238,6 +250,21 @@
           </div>
         </div>
       </div>
+
+      <!-- 替代座位安排 -->
+      <div class="section-card">
+        <div class="section-card-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          座位安排選項
+        </div>
+        <label class="alt-seat-row">
+          <input type="checkbox" id="alt-seat-check" checked>
+          <div>
+            <div>接受替代座位安排</div>
+            <div class="alt-seat-note">若指定座位已售完，是否接受系統安排其他座位</div>
+          </div>
+        </label>
+      </div>
     </div>
 
     <!-- 右欄：訂單摘要 -->
@@ -245,6 +272,7 @@
       <div class="order-summary">
         <div class="order-summary-header">📋 訂單摘要</div>
         <div class="order-summary-body">
+          <div id="time-disc-banner" class="time-disc-banner" style="display:none;"></div>
           <div id="price-breakdown"></div>
           <div class="summary-divider"></div>
 
@@ -354,6 +382,19 @@ let usedPoints = 0;
 let couponId   = null;
 let lastTicketId = null;
 
+/* ── 時間制折扣 ── */
+function getTimeDiscount() {
+  if (!P.date || !P.depart1) return { ratio:1, label:'', cls:'' };
+  const departDt = new Date(P.date + 'T' + P.depart1 + ':00');
+  const diffH = (departDt - new Date()) / 3600000;
+  if (diffH <= 0)   return { ratio:1,    label:'',                         cls:'' };
+  if (diffH < 6)    return { ratio:0.70, label:'6小時內購票優惠　7折',    cls:'time-disc-urgent' };
+  if (diffH < 12)   return { ratio:0.85, label:'6–12小時購票優惠　85折',  cls:'time-disc-hot' };
+  if (diffH < 24)   return { ratio:0.88, label:'12–24小時購票優惠　88折', cls:'time-disc-warm' };
+  if (diffH < 72)   return { ratio:0.95, label:'1–3天前購票優惠　95折',   cls:'time-disc-mild' };
+  return { ratio:1, label:'', cls:'' };
+}
+
 /* ── 行程摘要 ── */
 function renderTripSummary() {
   document.getElementById('display-from').textContent = P.from;
@@ -462,6 +503,7 @@ function renderPassengerForms() {
               <div><label class="form-label">姓名</label><input class="form-input" id="p-name-${t.key}-${i}" placeholder="乘客姓名"/></div>
               <div><label class="form-label">手機號碼</label><input class="form-input" type="tel" id="p-phone-${t.key}-${i}" placeholder="0912345678"/></div>
             </div>
+            ${t.key === 'general' ? `<div><label class="form-label">身分證字號</label><input class="form-input" id="p-nid-${t.key}-${i}" placeholder="A123456789"/></div>` : ''}
             ${extra}
           </div>
         </div>`;
@@ -505,22 +547,39 @@ function useAllPoints() {
 }
 
 function calcTotal() {
+  const timeDisc = getTimeDiscount();
   let subtotal = 0;
   TICKET_TYPES.forEach(t => {
     subtotal += Math.round(P.total * t.ratio) * qtys[t.key];
   });
   const totalQty = Object.values(qtys).reduce((a,b) => a+b, 0);
 
+  // 時間制折扣
+  const afterTimeDisc = Math.round(subtotal * timeDisc.ratio);
+  const timeDiscAmt   = subtotal - afterTimeDisc;
+
   const pts = parseInt(document.getElementById('points-input').value) || 0;
-  usedPoints = Math.max(0, Math.min(pts, getPoints(), subtotal));
+  usedPoints = Math.max(0, Math.min(pts, getPoints(), afterTimeDisc));
   if ((parseInt(document.getElementById('points-input').value)||0) !== usedPoints) {
     document.getElementById('points-input').value = usedPoints;
   }
   document.getElementById('points-info').textContent = usedPoints > 0 ? `折抵 NT$${usedPoints}` : '';
 
   const couponChecked = couponId && document.getElementById('coupon-check') && document.getElementById('coupon-check').checked;
-  const afterCoupon = couponChecked ? Math.round(subtotal * 0.8) : subtotal;
+  const afterCoupon = couponChecked ? Math.round(afterTimeDisc * 0.8) : afterTimeDisc;
   const finalTotal  = Math.max(0, afterCoupon - usedPoints);
+
+  // 時間制折扣橫幅
+  const discBanner = document.getElementById('time-disc-banner');
+  if (discBanner) {
+    if (timeDisc.cls && totalQty > 0) {
+      discBanner.className = `time-disc-banner ${timeDisc.cls}`;
+      discBanner.textContent = '⏰ ' + timeDisc.label;
+      discBanner.style.display = 'flex';
+    } else {
+      discBanner.style.display = 'none';
+    }
+  }
 
   let html = '';
   TICKET_TYPES.filter(t => qtys[t.key] > 0).forEach(t => {
@@ -529,7 +588,8 @@ function calcTotal() {
   });
   if (!totalQty) html = '<div style="font-size:13px;color:var(--color-text-light);">尚未選擇票種</div>';
   html += `<div class="summary-row" style="margin-top:6px;"><span>票券小計</span><span>NT$${subtotal}</span></div>`;
-  if (couponChecked) html += `<div class="summary-row" style="color:var(--color-accent-red);"><span>🎟️ 八折優惠</span><span>−NT$${subtotal - afterCoupon}</span></div>`;
+  if (timeDiscAmt > 0) html += `<div class="summary-row" style="color:#E65100;"><span>⏰ 時間制優惠</span><span>−NT$${timeDiscAmt}</span></div>`;
+  if (couponChecked) html += `<div class="summary-row" style="color:var(--color-accent-red);"><span>🎟️ 八折優惠</span><span>−NT$${afterTimeDisc - afterCoupon}</span></div>`;
   if (usedPoints > 0) html += `<div class="summary-row" style="color:#7A5A1A;"><span>⭐ 點數折抵</span><span>−NT$${usedPoints}</span></div>`;
   html += `<div class="summary-row total"><span>應付金額</span><span style="color:var(--color-accent-red);">NT$${finalTotal}</span></div>`;
   document.getElementById('summary-rows').innerHTML = html;
@@ -568,32 +628,41 @@ function handlePay() {
   // 產生訂單
   const now = new Date();
   const orderId = 'TK-' + now.getFullYear() + pad2(now.getMonth()+1) + pad2(now.getDate()) + '-' + Math.floor(Math.random()*9000+1000);
+  const altSeat = document.getElementById('alt-seat-check')?.checked ?? true;
+  const timeDisc = getTimeDiscount();
 
   const ticketIds = [];
   TICKET_TYPES.forEach(t => {
     for (let i = 0; i < qtys[t.key]; i++) {
       const name  = document.getElementById(`p-name-${t.key}-${i}`)?.value.trim() || '乘客';
       const phone = document.getElementById(`p-phone-${t.key}-${i}`)?.value.trim() || '';
+      const basePrice = Math.round(P.total * t.ratio);
+      const finalPrice = Math.round(basePrice * timeDisc.ratio);
+      const carNo  = Math.floor(Math.random() * 8) + 1;
+      const seatNo = Math.floor(Math.random() * 60) + 1;
       const ticket = {
-        id:            generateId(),
+        id:              generateId(),
         orderId,
-        fromStation:   P.from,
-        toStation:     P.to,
-        trainNo:       P.trainNo1,
-        trainType:     P.trainType1,
-        departTime:    P.depart1,
-        arriveTime:    isTransfer ? P.arrive2 : P.arrive1,
-        date:          P.date,
-        ticketType:    t.key,
-        price:         Math.round(P.total * t.ratio),
-        passengerName: name,
-        passengerPhone: phone,
-        status:        'unused',
-        pickupMethod:  pickupMethod,
-        qrCode:        'QR-' + Math.random().toString(36).slice(2,10).toUpperCase(),
-        linkedTripId:  null,
-        userId:        user.id,
-        createdAt:     now.toISOString(),
+        fromStation:     P.from,
+        toStation:       P.to,
+        trainNo:         P.trainNo1,
+        trainType:       P.trainType1,
+        departTime:      P.depart1,
+        arriveTime:      isTransfer ? P.arrive2 : P.arrive1,
+        date:            P.date,
+        ticketType:      t.key,
+        price:           finalPrice,
+        passengerName:   name,
+        passengerPhone:  phone,
+        status:          'unused',
+        pickupMethod:    pickupMethod,
+        carNo:           carNo,
+        seatNo:          seatNo,
+        alternativeSeat: altSeat,
+        qrCode:          'QR-' + Math.random().toString(36).slice(2,10).toUpperCase(),
+        linkedTripId:    null,
+        userId:          user.id,
+        createdAt:       now.toISOString(),
       };
       saveTicket(ticket);
       ticketIds.push(ticket.id);

@@ -316,6 +316,7 @@ function ticketCardHTML(t) {
           </div>
           <div class="ticket-meta" style="margin-top:2px;">
             車次 ${escHtml(t.trainNo)} ${escHtml(t.trainType)}
+            ${t.carNo ? `&nbsp;<span style="font-size:11px;background:#F0EBF8;color:#5B2D8E;padding:1px 7px;border-radius:20px;">第 ${t.carNo} 車廂・${t.seatNo} 號座位</span>` : ''}
             ${t.linkedTripId ? `&nbsp;<span style="font-size:11px;background:#E8F4ED;color:#2C6B4A;padding:1px 7px;border-radius:20px;">🗓 已加入行程</span>` : ''}
           </div>
         </div>
