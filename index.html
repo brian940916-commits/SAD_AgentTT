@@ -168,30 +168,6 @@
     }
     .station-desc { font-size: 13px; color: var(--color-text-sub); line-height: 1.7; }
 
-    /* ── 快速入口 ── */
-    .quick-entry-section {
-      padding: var(--space-xl) var(--space-xl) var(--space-3xl);
-      border-top: 1px solid var(--color-border-light);
-    }
-    .quick-entry-btns {
-      display: flex; gap: var(--space-md); flex-wrap: wrap; margin-top: var(--space-md);
-    }
-    .quick-entry-btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 12px 24px;
-      background: #fff;
-      border: 1.5px solid var(--color-border);
-      border-radius: var(--radius-md);
-      font-size: 14px; font-weight: 600; color: var(--color-text-main);
-      text-decoration: none;
-      transition: all var(--transition);
-    }
-    .quick-entry-btn:hover {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
-      box-shadow: var(--shadow-sm);
-    }
-
     /* ── 號召區塊 ── */
     .cta-section {
       background: linear-gradient(135deg, #2C4A3E 0%, #1A3A2E 100%);
@@ -384,18 +360,6 @@
     </div>
   </section>
 
-  <!-- ═══ 快速入口（登入後顯示）═══ -->
-  <section class="quick-entry-section" id="quick-entry-section" style="display:none;" aria-label="快速入口">
-    <div class="page-container">
-      <h2 class="section-title">快速入口</h2>
-      <div class="quick-entry-btns">
-        <a href="trip-list.html"       class="quick-entry-btn">🗓️ 我的行程</a>
-        <a href="train-tickets.html"   class="quick-entry-btn">🎫 我的票券</a>
-        <a href="property-orders.html" class="quick-entry-btn">🏠 我的訂單</a>
-      </div>
-    </div>
-  </section>
-
   <!-- ═══ 推薦小站 ═══ -->
   <section class="stations-section" aria-label="推薦小站">
     <div class="page-container">
@@ -491,11 +455,9 @@
   document.getElementById('search-date').value = today;
   document.getElementById('search-date').min   = today;
 
-  /* 未登入才顯示 CTA 區塊；登入後顯示快速入口 */
+  /* 未登入才顯示 CTA 區塊 */
   if (!getCurrentUser()) {
     document.getElementById('cta-section').style.display = 'block';
-  } else {
-    document.getElementById('quick-entry-section').style.display = 'block';
   }
 
   /* 點擊「開始規劃」→ 跳轉 trip-list.html（帶車站參數）*/
