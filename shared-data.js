@@ -20,6 +20,21 @@ const KEYS = {
   REVIEWS:        'agenttt_reviews',
 };
 
+const MESSAGES_SCHEMA_VERSION = '2';
+const SCHEMA_KEY = 'agenttt_schema_version';
+
+function migrateMessagesIfNeeded() {
+  const currentVersion = localStorage.getItem(SCHEMA_KEY);
+  if (currentVersion === MESSAGES_SCHEMA_VERSION) return;
+
+  const oldData = localStorage.getItem('agenttt_messages');
+  if (oldData) {
+    console.log('[AgentTT] 偵測到舊版訊息格式，已自動清空');
+    localStorage.removeItem('agenttt_messages');
+  }
+  localStorage.setItem(SCHEMA_KEY, MESSAGES_SCHEMA_VERSION);
+}
+
 /* ============================================================
    資料結構定義（JSDoc）
 
@@ -94,8 +109,18 @@ const KEYS = {
    Coupon: { id: string, userId: string, type: string,
              discount: number, expiresAt: string, usedAt: string|null }
 
-   Message: { id: string, userId: string, userName: string,
-               content: string, createdAt: string }
+   Message (legacy 行程留言用): { id, userId, userName, content, createdAt }
+
+   Conversation (v2 訂單對話): {
+     id: 'conv_<bookingId>', bookingId, propertyId, propertyName,
+     hostId, guestId, guestName,
+     messages: Message[], lastMessageAt, createdAt
+   }
+
+   Message (v2 訂單對話用): {
+     id, senderId, senderRole: 'guest'|'host',
+     text, createdAt, readBy: string[]
+   }
 
    Vote: { id: string, tripId: string, title: string,
            options: VoteOption[], createdAt: string }
@@ -269,6 +294,97 @@ function linkBookingToTrip(bookingId, tripId) {
   saveTrip(trip);
 }
 
+/* ── 訂單對話（v2）────────────────────────────────────────── */
+
+function getConversations() {
+  return getData(KEYS.MESSAGES) || [];
+}
+
+function getConversationByBookingId(bookingId) {
+  return getConversations().find(c => c.bookingId === bookingId) || null;
+}
+
+function getOrCreateConversation(booking) {
+  const convs = getConversations();
+  const existing = convs.find(c => c.bookingId === booking.id);
+  if (existing) return existing;
+
+  const prop = getPropertyById(booking.propertyId);
+  const conv = {
+    id:            'conv_' + booking.id,
+    bookingId:     booking.id,
+    propertyId:    booking.propertyId,
+    propertyName:  booking.propertyName,
+    hostId:        prop ? prop.hostId : null,
+    guestId:       booking.userId,
+    guestName:     booking.guestName || '旅客',
+    messages:      [],
+    lastMessageAt: nowISO(),
+    createdAt:     nowISO(),
+  };
+  convs.push(conv);
+  setData(KEYS.MESSAGES, convs);
+  return conv;
+}
+
+function sendMessage(bookingId, senderRole, text) {
+  const convs = getConversations();
+  const idx = convs.findIndex(c => c.bookingId === bookingId);
+  if (idx < 0) return null;
+  const user = getCurrentUser();
+  const msg = {
+    id:        generateId(),
+    senderId:  user ? user.id : '',
+    senderRole,
+    text,
+    createdAt: nowISO(),
+    readBy:    user ? [user.id] : [],
+  };
+  convs[idx].messages.push(msg);
+  convs[idx].lastMessageAt = msg.createdAt;
+  setData(KEYS.MESSAGES, convs);
+  return msg;
+}
+
+function markConversationRead(bookingId, userId) {
+  const convs = getConversations();
+  const idx = convs.findIndex(c => c.bookingId === bookingId);
+  if (idx < 0) return;
+  let changed = false;
+  convs[idx].messages.forEach(m => {
+    if (!m.readBy) m.readBy = [];
+    if (!m.readBy.includes(userId)) {
+      m.readBy.push(userId);
+      changed = true;
+    }
+  });
+  if (changed) setData(KEYS.MESSAGES, convs);
+}
+
+function getUnreadCountForUser(userId, role) {
+  const convs = getConversations();
+  const myConvs = role === 'host'
+    ? convs.filter(c => c.hostId === userId)
+    : convs.filter(c => c.guestId === userId);
+  return myConvs.reduce((sum, c) => {
+    return sum + c.messages.filter(m =>
+      m.senderId !== userId && !(m.readBy || []).includes(userId)
+    ).length;
+  }, 0);
+}
+
+function getConversationsByHost(hostId) {
+  return getConversations()
+    .filter(c => c.hostId === hostId)
+    .sort((a, b) => (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''));
+}
+
+function getConversationsByGuest(guestId) {
+  return getConversations()
+    .filter(c => c.guestId === guestId)
+    .sort((a, b) => (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''));
+}
+
 /* ── 點數 ────────────────────────────────────────────────── */
 
 function getPoints() {
@@ -417,6 +533,8 @@ function saveReview(review) {
 /* ── 假資料初始化 ─────────────────────────────────────────── */
 
 function init() {
+  migrateMessagesIfNeeded();
+
   if (getData('agenttt_initialized')) return;
 
   /* 使用者 */
