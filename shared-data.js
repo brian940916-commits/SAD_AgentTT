@@ -18,6 +18,7 @@ const KEYS = {
   FAVORITES:      'agenttt_favorites',
   MESSAGES:       'agenttt_messages',
   SETTINGS:       'agenttt_settings',
+  REVIEWS:        'agenttt_reviews',
 };
 
 /* ============================================================
@@ -407,6 +408,19 @@ function getSettings() {
 
 function saveSettings(settings) {
   setData(KEYS.SETTINGS, settings);
+}
+
+/* ── 評價 ────────────────────────────────────────────────── */
+
+function getReviews(propertyId) {
+  const all = getData(KEYS.REVIEWS) || [];
+  return propertyId ? all.filter(r => r.propertyId === propertyId) : all;
+}
+
+function saveReview(review) {
+  const all = getData(KEYS.REVIEWS) || [];
+  all.push(review);
+  setData(KEYS.REVIEWS, all);
 }
 
 /* ── 假資料初始化 ─────────────────────────────────────────── */

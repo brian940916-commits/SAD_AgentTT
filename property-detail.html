@@ -419,25 +419,6 @@
     };
   }
 
-  /* ── 假評價資料 ── */
-  const FAKE_REVIEWS = {
-    prop_01: [
-      { name:'林小花', date:'2026-04-10', rating:5, text:'超讚！從車站步行三分鐘就到了，房間乾淨寬敞，床很舒適，老闆非常親切，還借了腳踏車給我們騎。下次還要來！' },
-      { name:'陳大明', date:'2026-03-22', rating:5, text:'完全符合期待，田園風景很療癒，早餐也好吃，推薦集集香蕉奶昔！' },
-      { name:'王美玲', date:'2026-02-14', rating:4, text:'整體很不錯，衛浴設備有點舊但還是很乾淨。位置超便利，值得再訪。' },
-    ],
-    prop_02: [
-      { name:'張大山', date:'2026-05-01', rating:5, text:'木頭香味療癒心靈！整棟民宿用台灣檜木打造，晚上打開窗就是山林聲，完全放鬆。木作體驗也很有趣。' },
-      { name:'黃小芸', date:'2026-04-15', rating:5, text:'絕對是車埕最有特色的民宿，老闆很熱情，早餐豐盛，停車也方便。強力推薦！' },
-      { name:'劉志偉', date:'2026-03-05', rating:5, text:'整體非常滿意，只是假日人稍多，建議平日前往更清靜。' },
-    ],
-    prop_03: [
-      { name:'蔡小雨', date:'2026-04-28', rating:4, text:'鐵道迷天堂！從窗戶就能看到扇形車庫，超興奮。位置絕佳，步行到彰化火車站只要五分鐘。' },
-      { name:'吳小偉', date:'2026-03-18', rating:5, text:'青旅裡設備齊全，共用廚房很方便，認識了很多同行旅客，CP值超高！' },
-      { name:'許大明', date:'2026-02-08', rating:4, text:'乾淨、便宜、交通方便，三個優點都有。唯一小缺點是晚上車站有一點聲音。' },
-    ],
-  };
-
   /* ── 購物車 ── */
   const CART_KEY = 'agenttt_cart';
   function getCart() { try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]'); } catch { return []; } }
@@ -555,12 +536,32 @@
 
   /* ── 評價列表 ── */
   function renderReviews() {
-    const reviews  = FAKE_REVIEWS[propId] || [];
-    const rating   = propData.rating || 0;
-    const distrib  = [0, 0, 10, 20, 30, 40]; // fake distribution
+    const reviews = getReviews(propId);
 
-    /* 評分摘要 */
-    const barsHtml = [5,4,3].map(n => `
+    if (!reviews.length) {
+      document.getElementById('review-summary').innerHTML =
+        `<div style="color:var(--color-text-sub);font-size:14px;padding:var(--space-sm) 0;">尚無評價，成為第一個評價此房源的旅客！</div>`;
+      document.getElementById('review-list').innerHTML = '';
+      document.getElementById('prop-stars').textContent      = '☆☆☆☆☆';
+      document.getElementById('prop-rating-count').textContent = '（尚無評價）';
+      return;
+    }
+
+    /* 動態計算平均分與星等分佈 */
+    const avg      = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+    const avgFixed = avg.toFixed(1);
+    const distrib  = {};
+    [1,2,3,4,5].forEach(n => {
+      distrib[n] = Math.round(reviews.filter(r => r.rating === n).length / reviews.length * 100);
+    });
+
+    /* 更新 header 評分 */
+    const filled = Math.round(avg);
+    document.getElementById('prop-stars').textContent        = '★'.repeat(filled) + '☆'.repeat(5 - filled) + ' ' + avgFixed;
+    document.getElementById('prop-rating-count').textContent = `（${reviews.length} 則評價）`;
+
+    /* 評分摘要區塊 */
+    const barsHtml = [5,4,3,2,1].map(n => `
       <div class="review-bar-row">
         <span class="review-bar-label">${n}★</span>
         <div class="review-bar-track">
@@ -571,29 +572,34 @@
 
     document.getElementById('review-summary').innerHTML = `
       <div style="text-align:center;">
-        <div class="review-big-score">${rating}</div>
-        <div style="color:var(--color-accent-yellow);font-size:18px;">${'★'.repeat(Math.round(rating))}${'☆'.repeat(5-Math.round(rating))}</div>
-        <div style="font-size:12px;color:var(--color-text-sub);margin-top:4px;">${propData.reviewCount || 0} 則評價</div>
+        <div class="review-big-score">${avgFixed}</div>
+        <div style="color:var(--color-accent-yellow);font-size:18px;">${'★'.repeat(filled)}${'☆'.repeat(5-filled)}</div>
+        <div style="font-size:12px;color:var(--color-text-sub);margin-top:4px;">${reviews.length} 則評價</div>
       </div>
       <div class="review-bar-wrap">${barsHtml}</div>
     `;
 
-    document.getElementById('review-list').innerHTML = reviews.map(r => {
-      const initial = r.name.slice(0, 1);
-      const stars   = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
-      return `
-        <div class="review-card">
-          <div class="review-header">
-            <div class="reviewer-avatar">${escHtml(initial)}</div>
-            <div>
-              <div class="reviewer-name">${escHtml(r.name)}</div>
-              <div class="reviewer-date">${escHtml(r.date)}</div>
+    /* 評價列表（最新優先） */
+    document.getElementById('review-list').innerHTML = reviews
+      .slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map(r => {
+        const name    = r.userName || r.name || '旅客';
+        const initial = name.slice(0, 1);
+        const date    = r.createdAt ? r.createdAt.slice(0, 10) : (r.date || '');
+        const stars   = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+        return `
+          <div class="review-card">
+            <div class="review-header">
+              <div class="reviewer-avatar">${escHtml(initial)}</div>
+              <div>
+                <div class="reviewer-name">${escHtml(name)}</div>
+                <div class="reviewer-date">${escHtml(date)}</div>
+              </div>
+              <div class="review-stars" style="margin-left:auto;">${stars}</div>
             </div>
-            <div class="review-stars" style="margin-left:auto;">${stars}</div>
-          </div>
-          <div class="review-text">${escHtml(r.text)}</div>
-        </div>`;
-    }).join('');
+            <div class="review-text">${escHtml(r.text)}</div>
+          </div>`;
+      }).join('');
   }
 
   /* ── 預填日期 ── */
