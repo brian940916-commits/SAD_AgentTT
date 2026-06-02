@@ -697,7 +697,8 @@
   }
 
   function sendCsReply(text) {
-    pushCsMsg(text, false);
+    const inp = document.getElementById('cs-input-field');
+    if (inp) { inp.value = text; inp.focus(); }
   }
   function sendCsMsg() {
     const inp = document.getElementById('cs-input-field');

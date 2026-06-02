@@ -917,7 +917,8 @@
   }
 
   function sendCanned(text) {
-    pushMsg(text);
+    const input = document.getElementById('chat-input-field');
+    if (input) { input.value = text; input.focus(); }
   }
 
   function pushMsg(text) {
