@@ -635,6 +635,28 @@ function calcTotal() {
   const afterTimeDisc = Math.round(afterCarDisc * timeDisc.ratio);
   const timeDiscAmt   = afterCarDisc - afterTimeDisc;
 
+  // 票種折扣與八折券互斥：只要有非一般票就鎖定優惠券
+  const hasDiscountedType = ['student','senior','disabled','child'].some(k => qtys[k] > 0);
+  const couponCheck = document.getElementById('coupon-check');
+  const couponBox   = couponCheck ? couponCheck.closest('.coupon-box') : null;
+  if (couponCheck) {
+    if (hasDiscountedType) {
+      couponCheck.checked  = false;
+      couponCheck.disabled = true;
+      if (couponBox && !couponBox.querySelector('.coupon-lock-note')) {
+        const note = document.createElement('div');
+        note.className = 'coupon-lock-note';
+        note.style.cssText = 'font-size:11px;color:#999;margin-top:6px;';
+        note.textContent = '⚠️ 已選用票種折扣，無法同時使用優惠券';
+        couponBox.appendChild(note);
+      }
+    } else {
+      couponCheck.disabled = false;
+      const note = couponBox && couponBox.querySelector('.coupon-lock-note');
+      if (note) note.remove();
+    }
+  }
+
   const pts = parseInt(document.getElementById('points-input').value) || 0;
   usedPoints = Math.max(0, Math.min(pts, getPoints(), afterTimeDisc));
   if ((parseInt(document.getElementById('points-input').value)||0) !== usedPoints) {
