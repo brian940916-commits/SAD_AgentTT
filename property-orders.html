@@ -619,6 +619,18 @@
       createdAt:   nowISO(),
     });
 
+    // 同步更新房源的平均評分與評價數
+    const prop = getPropertyById(reviewBooking.propertyId);
+    if (prop) {
+      const allRevs = JSON.parse(localStorage.getItem('agenttt_reviews') || '[]')
+        .filter(r => r.propertyId === reviewBooking.propertyId);
+      prop.reviewCount = allRevs.length;
+      prop.rating = allRevs.length
+        ? Math.round(allRevs.reduce((s, r) => s + r.rating, 0) / allRevs.length * 10) / 10
+        : 0;
+      saveProperty(prop);
+    }
+
     closeReview();
     renderList();
     showToast('🎉 感謝您的評價！');

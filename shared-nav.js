@@ -46,11 +46,12 @@ function _logoutItem() {
 function _dropdownMenuByRole(role) {
   if (role === 'guest') {
     return [
-      _dropdownItem('trip-list.html',       '📅 我的行程'),
-      _dropdownItem('property-orders.html', '🏠 我的訂單'),
-      _dropdownItem('train-tickets.html',   '🎫 我的票券'),
-      _dropdownItem('train-points.html',    '⭐ 點數中心'),
-      _dropdownItem('train-complaint.html', '💬 客訴服務'),
+      _dropdownItem('trip-list.html',              '📅 我的行程'),
+      _dropdownItem('property-orders.html',         '🏠 我的訂單'),
+      _dropdownItem('property-search.html?fav=1',   '❤️ 我的收藏'),
+      _dropdownItem('train-tickets.html',            '🎫 我的票券'),
+      _dropdownItem('train-points.html',             '⭐ 點數中心'),
+      _dropdownItem('train-complaint.html',          '💬 客訴服務'),
       '<div class="dropdown-divider"></div>',
       _logoutItem(),
     ].join('');

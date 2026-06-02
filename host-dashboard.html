@@ -184,6 +184,7 @@
     .badge-offline  { background: #e0ddd5; color: var(--color-text-sub); }
     .badge-paid     { background: var(--color-success); color: var(--color-success-text); }
     .badge-cancelled{ background: var(--color-danger);  color: var(--color-danger-text); }
+    .badge-danger   { background: var(--color-danger);  color: var(--color-danger-text); }
     .badge-completed{ background: #E3F2FD; color: #1565C0; }
 
     /* Toast */
@@ -574,7 +575,8 @@
       priceWeekend: Number(document.getElementById('p-price-we').value) || 0,
       priceHoliday: Number(document.getElementById('p-price-h').value) || 0,
       facilities,
-      status:       isEdit ? (existProp?.status || 'pending') : 'pending',
+      status:       'pending',
+      rejectReason: '',
       rating:       existProp?.rating || 0,
       reviewCount:  existProp?.reviewCount || 0,
       createdAt:    existProp?.createdAt || nowISO(),
@@ -585,7 +587,7 @@
     document.getElementById('add-prop-panel').classList.remove('open');
     renderPropList();
     renderPricingPropSelect();
-    showToast(isEdit ? '✅ 房源資料已更新' : '✅ 房源已送出審核，待管理員核准後上線');
+    showToast('✅ 房源已送出審核，待管理員核准後上線');
   }
 
   function renderPropList() {
@@ -596,23 +598,26 @@
     }
     el.innerHTML = hostProps.map(p => {
       const th  = thumb(p.id);
-      const isPending = p.status === 'pending';
-      const statusMap = { pending:'badge-pending', online:'badge-online', offline:'badge-offline' };
-      const statusLbl = { pending:'待審核', online:'上線中', offline:'已下架' };
+      const isPending   = p.status === 'pending';
+      const isRejected  = p.status === 'offline' && !!p.rejectReason;
+      const statusMap   = { pending:'badge-pending', online:'badge-online', offline:'badge-offline' };
+      const statusLbl   = { pending:'待審核', online:'上線中', offline: isRejected ? '審核退件' : '已下架' };
       return `
         <div class="prop-host-card">
           <div class="prop-host-thumb" style="background:${th.bg};">${th.emoji}</div>
           <div class="prop-host-body">
             <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:4px;">
               <div class="prop-host-name">${escHtml(p.name)}</div>
-              <span class="badge ${statusMap[p.status] || ''}">${statusLbl[p.status] || p.status}</span>
+              <span class="badge ${isRejected ? 'badge-danger' : (statusMap[p.status] || '')}">${statusLbl[p.status] || p.status}</span>
             </div>
             <div class="prop-host-meta">📍 ${escHtml(p.station)}・🏠 ${escHtml(p.roomType)}・平日 NT$ ${(p.priceWeekday||0).toLocaleString()} / 晚</div>
-            ${isPending ? `<div style="font-size:12px;color:var(--color-warning-text);margin-top:4px;">⏳ 等待管理員審核，審核通過後自動上線</div>` : ''}
+            ${isPending  ? `<div style="font-size:12px;color:var(--color-warning-text);margin-top:4px;">⏳ 等待管理員審核，審核通過後自動上線</div>` : ''}
+            ${isRejected ? `<div style="font-size:12px;color:var(--color-danger-text);background:var(--color-danger);border-radius:6px;padding:6px 10px;margin-top:6px;">❌ 退件原因：${escHtml(p.rejectReason)}</div>` : ''}
             <div class="prop-host-actions">
               ${!isPending ? `<button class="btn btn-outline btn-sm" onclick="toggleAddPanel('${escHtml(p.id)}')">✏️ 編輯</button>` : ''}
-              ${p.status === 'online'  ? `<button class="btn btn-ghost btn-sm" onclick="setPropStatus('${escHtml(p.id)}','offline')">下架</button>` : ''}
-              ${p.status === 'offline' ? `<button class="btn btn-primary btn-sm" onclick="setPropStatus('${escHtml(p.id)}','online')">重新上架</button>` : ''}
+              ${p.status === 'online'   ? `<button class="btn btn-ghost btn-sm" onclick="setPropStatus('${escHtml(p.id)}','offline')">下架</button>` : ''}
+              ${p.status === 'offline' && !isRejected ? `<button class="btn btn-primary btn-sm" onclick="setPropStatus('${escHtml(p.id)}','online')">重新上架</button>` : ''}
+              ${isRejected ? `<button class="btn btn-primary btn-sm" onclick="resubmitProp('${escHtml(p.id)}')">修改並重新送審</button>` : ''}
             </div>
           </div>
         </div>`;
@@ -626,6 +631,12 @@
     hostProps = getProperties().filter(p => p.hostId === currentUser.id);
     renderPropList();
     showToast(status === 'online' ? '✅ 房源已重新上架' : '✅ 房源已下架');
+  }
+
+  function resubmitProp(propId) {
+    // 開啟編輯面板，送出後清除退件原因並重新進入待審核
+    toggleAddPanel(propId);
+    showToast('⚠️ 請修改後點擊「送出審核」，管理員審核通過後才會上線');
   }
 
   function previewPropPhotos(input) {

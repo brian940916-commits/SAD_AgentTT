@@ -295,6 +295,12 @@
 
         <!-- 右側結果 -->
         <div>
+          <div id="fav-mode-banner" style="display:none;align-items:center;gap:10px;background:#fff3f5;border:1px solid #f5c0c0;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:14px;">
+            <span style="font-size:18px;">❤️</span>
+            <span style="font-weight:600;color:#C4514A;">我的收藏</span>
+            <span style="color:#888;">・僅顯示已收藏房源</span>
+            <a href="property-search.html" style="margin-left:auto;font-size:13px;color:#2C4A3E;">返回全部搜尋 →</a>
+          </div>
           <div class="results-header">
             <div class="results-count" id="results-count"></div>
             <select class="sort-select" id="sort-select" onchange="applyFilters()">
@@ -392,6 +398,8 @@
     searchCheckOut = fmt(checkout);
   })();
 
+  let favMode = false;
+
   /* ── 初始化 ── */
   function init() {
     allProperties = getProperties().filter(p => p.status === 'online');
@@ -399,6 +407,10 @@
 
     // URL 參數預填
     const params = new URLSearchParams(window.location.search);
+    if (params.get('fav') === '1') {
+      favMode = true;
+      document.getElementById('fav-mode-banner').style.display = 'flex';
+    }
     if (params.get('station')) {
       document.getElementById('s-station').value = params.get('station');
       searchStation = params.get('station');
@@ -429,6 +441,12 @@
     const sortBy    = document.getElementById('sort-select').value;
 
     let result = allProperties.slice();
+
+    // 收藏模式：只顯示已收藏房源
+    if (favMode) {
+      const faves = getFavorites();
+      result = result.filter(p => faves.includes(p.id));
+    }
 
     // 車站篩選
     if (searchStation) result = result.filter(p => p.station === searchStation);

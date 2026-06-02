@@ -626,21 +626,39 @@ function emptyBox(msg) {
 
 /* ── 讀取 URL 參數（從票券頁直接跳入）── */
 function initFromURL() {
-  const sp = new URLSearchParams(location.search);
+  const sp    = new URLSearchParams(location.search);
   const preId = sp.get('ticketId');
+  const tab   = sp.get('tab');
+
+  if (tab === 'change') {
+    const btn = document.querySelector('.main-tab[onclick*="change"]');
+    if (btn) showTab('change', btn);
+  }
+
   if (preId) {
     const ticket = getTicketById(preId);
     if (ticket && ticket.status === 'unused') {
-      selectedRefundTicket = ticket;
-      // 選取對應的 radio
-      setTimeout(() => {
-        const radio = document.querySelector(`input[value="${preId}"]`);
-        if (radio) {
-          radio.checked = true;
-          radio.closest('.ticket-option')?.classList.add('selected');
-        }
-        renderRefundCalc(ticket);
-      }, 100);
+      if (tab === 'change') {
+        selectedChangeTicket = ticket;
+        setTimeout(() => {
+          const radio = document.querySelector(`#change-ticket-list input[value="${preId}"]`);
+          if (radio) {
+            radio.checked = true;
+            radio.closest('.ticket-option')?.classList.add('selected');
+          }
+          onSelectTicket('change', preId);
+        }, 100);
+      } else {
+        selectedRefundTicket = ticket;
+        setTimeout(() => {
+          const radio = document.querySelector(`input[value="${preId}"]`);
+          if (radio) {
+            radio.checked = true;
+            radio.closest('.ticket-option')?.classList.add('selected');
+          }
+          renderRefundCalc(ticket);
+        }, 100);
+      }
     }
   }
 }

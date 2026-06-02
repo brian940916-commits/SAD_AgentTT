@@ -416,7 +416,16 @@ function setFilter(f) {
    渲染行程列表
 ──────────────────────────────────────────── */
 function renderList() {
-  const allTrips = getTripsByUser(currentUser.id);
+  const today = new Date().toISOString().slice(0, 10);
+  let allTrips = getTripsByUser(currentUser.id);
+  // 結束日期已過且仍是規劃中 → 自動標記完成
+  allTrips.forEach(t => {
+    if (t.status === 'planning' && t.endDate < today) {
+      t.status = 'completed';
+      saveTrip(t);
+    }
+  });
+  allTrips = getTripsByUser(currentUser.id);
   const trips = currentFilter === 'all'
     ? allTrips
     : allTrips.filter(t => t.status === currentFilter);
