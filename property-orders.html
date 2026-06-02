@@ -259,6 +259,28 @@
   </div>
 </div>
 
+<!-- ── 聯絡房東 Modal ── -->
+<div class="modal-overlay" id="contact-modal" role="dialog" aria-modal="true" aria-label="聯絡房東">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">💬 聯絡房東</div>
+      <button class="modal-close" onclick="closeContact()" aria-label="關閉">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="contact-host-info" style="margin-bottom:var(--space-md);"></div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label" for="contact-msg">訊息內容 <span style="color:var(--color-accent-red);">*</span></label>
+        <textarea class="form-input" id="contact-msg" rows="4" placeholder="請輸入您的問題或訊息…"></textarea>
+        <div id="contact-err" style="display:none;font-size:12px;color:var(--color-accent-red);margin-top:4px;">請輸入訊息內容</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeContact()">取消</button>
+      <button class="btn btn-primary" onclick="submitContact()">送出訊息</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -375,6 +397,9 @@
     }
     if (reviewed) {
       actions += `<span style="font-size:12px;color:var(--color-success-text);">✅ 已評價</span>`;
+    }
+    if (b.status !== 'cancelled') {
+      actions += `<button class="btn btn-outline btn-sm" onclick="openContact('${escHtml(b.id)}')">💬 聯絡房東</button>`;
     }
 
     const nights  = b.nights || Math.round((checkOut - checkIn) / 86400000);
@@ -600,6 +625,46 @@
   }
 
   init();
+
+  /* ════════════════════════════════
+     聯絡房東 Modal
+  ════════════════════════════════ */
+  let contactBooking = null;
+
+  function openContact(bookingId) {
+    contactBooking = allBookings.find(b => b.id === bookingId);
+    if (!contactBooking) return;
+
+    const prop = getPropertyById(contactBooking.propertyId);
+    const host = prop ? getUserById(prop.hostId) : null;
+
+    document.getElementById('contact-host-info').innerHTML = `
+      <div style="background:var(--color-secondary);border-radius:var(--radius-md);padding:var(--space-md);">
+        <div style="font-size:15px;font-weight:700;margin-bottom:6px;">${escHtml(contactBooking.propertyName)}</div>
+        <div style="font-size:13px;color:var(--color-text-sub);">
+          🏡 房東：${host ? escHtml(host.name) : '未知'}<br>
+          📅 訂單：${escHtml(contactBooking.checkIn)} — ${escHtml(contactBooking.checkOut)}
+        </div>
+      </div>`;
+    document.getElementById('contact-msg').value = '';
+    document.getElementById('contact-err').style.display = 'none';
+    document.getElementById('contact-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeContact() {
+    document.getElementById('contact-modal').classList.remove('open');
+    document.body.style.overflow = '';
+    contactBooking = null;
+  }
+
+  function submitContact() {
+    const msg = document.getElementById('contact-msg').value.trim();
+    if (!msg) { document.getElementById('contact-err').style.display = 'block'; return; }
+    document.getElementById('contact-err').style.display = 'none';
+    closeContact();
+    showToast('✅ 訊息已送出，房東將盡快回覆');
+  }
 </script>
 </body>
 </html>

@@ -501,6 +501,9 @@ function renderHeader() {
   document.getElementById('quick-collab').href = `trip-collab.html?id=${tripId}`;
   document.getElementById('quick-expense').href= `trip-expense.html?id=${tripId}`;
 
+  const hotelParams = new URLSearchParams({ station: t.station || '', checkin: t.startDate, checkout: t.endDate });
+  document.getElementById('quick-hotel').href  = `property-search.html?${hotelParams.toString()}`;
+
   const days     = getDayCount(t);
   const members  = (t.members || []).length;
   const statusMap= { planning:'規劃中', completed:'已完成', cancelled:'已取消' };
@@ -638,7 +641,7 @@ function renderIntegratedCards(day) {
               ／ ${ord.map(t=>t.trainNo+'('+t.trainType+')').join(' + ')}
             </div>
           </div>
-          <span class="badge badge-success" style="flex-shrink:0;">已訂票</span>
+          <a href="train-tickets.html" class="badge badge-success" style="flex-shrink:0;text-decoration:none;">已訂票 →</a>
         </div>`;
     }
   }

@@ -457,7 +457,7 @@ function handleRegister() {
   clearMessages();
   const name     = document.getElementById('reg-name').value.trim();
   const phone    = document.getElementById('reg-phone').value.trim();
-  const email    = document.getElementById('reg-email').value.trim();
+  const email    = document.getElementById('reg-email').value.trim().toLowerCase();
   const password = document.getElementById('reg-password').value;
 
   if (!name || !phone || !email || !password) {

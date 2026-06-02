@@ -162,7 +162,8 @@ function saveUser(user) {
 }
 
 function findUserByEmail(email) {
-  return getUsers().find(u => u.email === email) || null;
+  const lower = (email || '').toLowerCase();
+  return getUsers().find(u => (u.email || '').toLowerCase() === lower) || null;
 }
 
 /* ── 行程 ────────────────────────────────────────────────── */

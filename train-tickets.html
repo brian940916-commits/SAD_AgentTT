@@ -203,6 +203,29 @@
   </div>
 </div>
 
+<!-- ── 改票 Modal ── -->
+<div class="modal-overlay" id="change-modal" role="dialog" aria-modal="true" aria-label="改票">
+  <div class="modal-box">
+    <div class="modal-title">🔄 改票</div>
+    <div class="modal-sub" id="change-route"></div>
+    <div style="margin:16px 0;">
+      <label class="modal-form-label">原乘車日期</label>
+      <div id="change-old-date" style="font-size:14px;font-weight:600;color:var(--color-text-main);margin-bottom:14px;"></div>
+      <label class="modal-form-label">更改為</label>
+      <input type="date" class="modal-input" id="change-new-date" style="margin-top:4px;"/>
+      <div id="change-error" style="display:none;font-size:12px;color:#C4514A;margin-top:6px;"></div>
+    </div>
+    <div style="font-size:12px;color:var(--color-text-light);background:var(--color-secondary);padding:10px 14px;border-radius:var(--radius-md);margin-bottom:16px;line-height:1.8;">
+      ⚠️ 改票費用：每張加收手續費 NT$10。<br>
+      須在原乘車日期前 1 小時前申請。
+    </div>
+    <div class="modal-btn-row">
+      <button class="btn-cancel" onclick="closeModal('change-modal')">取消</button>
+      <button class="btn-confirm" onclick="confirmChangeDate()">確認改票</button>
+    </div>
+  </div>
+</div>
+
 <div id="footer-container"></div>
 <script src="shared-data.js"></script>
 <script src="shared-nav.js"></script>
@@ -211,9 +234,10 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-let currentFilter = 'all';
-let splitTargetId = null;
-let splitMethod   = 'phone';
+let currentFilter  = 'all';
+let splitTargetId  = null;
+let splitMethod    = 'phone';
+let changeTargetId = null;
 
 const STATUS_LABEL = { unused:'未使用', used:'已使用', refunded:'已退票', split:'已分票' };
 const STATUS_CLASS  = { unused:'status-unused', used:'status-used', refunded:'status-refunded', split:'status-split' };
@@ -277,6 +301,7 @@ function ticketCardHTML(t) {
       actions += pickupNotice;
     }
     actions += `<button class="act-btn act-btn-outline" onclick="showSplit('${escHtml(t.id)}')">分票</button>`;
+    actions += `<button class="act-btn act-btn-outline" onclick="openChangeDate('${escHtml(t.id)}')">改票</button>`;
     actions += `<button class="act-btn act-btn-danger" onclick="window.location.href='train-refund.html?ticketId=${escHtml(t.id)}'">退票</button>`;
   } else if (!isRefunded && !isSplit) {
     if (pickup === 'qr') {
@@ -450,6 +475,50 @@ function confirmSplit() {
 /* ── 關閉 Modal ── */
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
+}
+
+/* ── 改票 ── */
+function openChangeDate(ticketId) {
+  const ticket = getTicketById(ticketId);
+  if (!ticket) return;
+  changeTargetId = ticketId;
+
+  document.getElementById('change-route').textContent    = `${ticket.fromStation} → ${ticket.toStation}（車次 ${ticket.trainNo}）`;
+  document.getElementById('change-old-date').textContent = ticket.date;
+  const today = new Date().toISOString().slice(0, 10);
+  const input = document.getElementById('change-new-date');
+  input.value = ticket.date;
+  input.min   = today;
+  document.getElementById('change-error').style.display = 'none';
+
+  document.getElementById('change-modal').classList.add('open');
+}
+
+function confirmChangeDate() {
+  const newDate = document.getElementById('change-new-date').value;
+  const errEl   = document.getElementById('change-error');
+  if (!newDate) { errEl.textContent = '請選擇新的乘車日期'; errEl.style.display = 'block'; return; }
+
+  const ticket = getTicketById(changeTargetId);
+  if (!ticket) return;
+  if (newDate === ticket.date) { errEl.textContent = '新日期與原日期相同'; errEl.style.display = 'block'; return; }
+
+  const tickets = getTickets();
+  const idx = tickets.findIndex(t => t.id === changeTargetId);
+  if (idx >= 0) {
+    tickets[idx].date = newDate;
+    setData('agenttt_tickets', tickets);
+  }
+
+  closeModal('change-modal');
+  changeTargetId = null;
+  renderTickets();
+  const toast = document.createElement('div');
+  toast.className = 'toast show';
+  toast.textContent = '✅ 改票成功！';
+  toast.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#2C4A3E;color:#fff;padding:10px 24px;border-radius:99px;font-size:13px;font-weight:500;z-index:9999;';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
 }
 
 document.querySelectorAll('.modal-overlay').forEach(el => {

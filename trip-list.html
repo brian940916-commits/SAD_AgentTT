@@ -296,6 +296,68 @@
 </div>
 
 <!-- ══════════════════════════════════════════════
+     編輯行程 Modal
+══════════════════════════════════════════════ -->
+<div class="modal-backdrop hidden" id="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title" id="edit-modal-title">✏️ 編輯行程</h2>
+      <button class="modal-close" onclick="closeEditModal()" aria-label="關閉">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-trip-id"/>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">行程名稱</label>
+        <input type="text" class="form-input" id="edit-trip-name" placeholder="請輸入行程名稱"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">出發日期</label>
+          <input type="date" class="form-input" id="edit-trip-start"/>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">返回日期</label>
+          <input type="date" class="form-input" id="edit-trip-end"/>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">出發車站</label>
+        <select class="modal-station-select" id="edit-trip-station">
+          <option value="">請選擇車站</option>
+          <optgroup label="彰化縣">
+            <option value="彰化站">彰化站</option>
+            <option value="花壇站">花壇站</option>
+            <option value="大村站">大村站</option>
+            <option value="員林站">員林站</option>
+            <option value="田中站">田中站</option>
+            <option value="二水站">二水站</option>
+          </optgroup>
+          <optgroup label="南投縣（集集線）">
+            <option value="集集站">集集站</option>
+            <option value="源泉站">源泉站</option>
+            <option value="濁水站">濁水站</option>
+            <option value="龍泉站">龍泉站</option>
+            <option value="水里站">水里站</option>
+            <option value="車埕站">車埕站</option>
+          </optgroup>
+          <optgroup label="台中市">
+            <option value="台中站">台中站</option>
+            <option value="豐原站">豐原站</option>
+            <option value="新烏日站">新烏日站</option>
+            <option value="大肚站">大肚站</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="error-text hidden" id="edit-trip-error" style="margin-top:10px;font-size:13px;color:var(--color-accent-red);"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeEditModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveEditTrip()">儲存變更</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
      Toast 容器
 ══════════════════════════════════════════════ -->
 <div class="toast-container" id="toast-container"></div>
@@ -440,7 +502,7 @@ function tripCardHTML(trip) {
           <button class="btn btn-ghost btn-sm" onclick="toggleMoreMenu(event,'more-${trip.id}')"
                   aria-haspopup="true" aria-label="更多操作">⋯ 更多</button>
           <div class="dropdown-menu hidden" id="more-${trip.id}">
-            <a href="trip-edit.html?id=${trip.id}" class="dropdown-item">✏️ 編輯行程</a>
+            <button class="dropdown-item" onclick="openEditModal('${trip.id}')">✏️ 編輯行程</button>
             <a href="trip-readonly.html?id=${trip.id}" class="dropdown-item" target="_blank">🔗 分享行程</a>
             <div class="dropdown-divider"></div>
             <button class="dropdown-item danger" onclick="openDeleteModal('${trip.id}','${escAttr(trip.name)}')">🗑 刪除行程</button>
@@ -620,6 +682,49 @@ function doCreateTrip() {
 /* ────────────────────────────────────────────
    刪除 Modal
 ──────────────────────────────────────────── */
+/* ────────────────────────────────────────────
+   編輯行程 Modal
+──────────────────────────────────────────── */
+function openEditModal(tripId) {
+  const trip = getTripById(tripId);
+  if (!trip) return;
+  document.getElementById('edit-trip-id').value      = tripId;
+  document.getElementById('edit-trip-name').value    = trip.name;
+  document.getElementById('edit-trip-start').value   = trip.startDate;
+  document.getElementById('edit-trip-end').value     = trip.endDate;
+  document.getElementById('edit-trip-station').value = trip.station || '';
+  document.getElementById('edit-trip-error').classList.add('hidden');
+  document.getElementById('edit-modal').classList.remove('hidden');
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+}
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.add('hidden');
+}
+function saveEditTrip() {
+  const tripId  = document.getElementById('edit-trip-id').value;
+  const name    = document.getElementById('edit-trip-name').value.trim();
+  const start   = document.getElementById('edit-trip-start').value;
+  const end     = document.getElementById('edit-trip-end').value;
+  const station = document.getElementById('edit-trip-station').value;
+  const errEl   = document.getElementById('edit-trip-error');
+
+  if (!name)  { errEl.textContent = '請輸入行程名稱'; errEl.classList.remove('hidden'); return; }
+  if (!start) { errEl.textContent = '請選擇出發日期'; errEl.classList.remove('hidden'); return; }
+  if (!end)   { errEl.textContent = '請選擇返回日期'; errEl.classList.remove('hidden'); return; }
+  if (end < start) { errEl.textContent = '返回日期不能早於出發日期'; errEl.classList.remove('hidden'); return; }
+
+  const trip = getTripById(tripId);
+  if (!trip) return;
+  trip.name      = name;
+  trip.startDate = start;
+  trip.endDate   = end;
+  trip.station   = station;
+  saveTrip(trip);
+  closeEditModal();
+  showToast('行程已更新', 'success');
+  renderList();
+}
+
 function openDeleteModal(id, name) {
   deletingTripId = id;
   document.getElementById('delete-trip-name').textContent = name;

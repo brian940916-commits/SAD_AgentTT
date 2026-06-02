@@ -334,7 +334,7 @@
 
           <button class="pay-btn" id="pay-btn" onclick="handlePay()">前往付款</button>
           <div style="font-size:11px;color:var(--color-text-light);text-align:center;margin-top:8px;">
-            點擊即代表同意 <a href="#" style="color:var(--color-primary);">乘車規則</a> 與 <a href="#" style="color:var(--color-primary);">退改票規定</a>
+            點擊即代表同意 <a href="#" onclick="openRulesModal('riding');return false;" style="color:var(--color-primary);">乘車規則</a> 與 <a href="#" onclick="openRulesModal('refund');return false;" style="color:var(--color-primary);">退改票規定</a>
           </div>
         </div>
       </div>
@@ -384,6 +384,17 @@
     <div class="modal-btn-row">
       <button class="btn-skip" onclick="document.getElementById('pay-confirm-modal').classList.remove('open')">返回修改</button>
       <button class="btn-link" onclick="confirmPay()">確認付款</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 乘車規則 / 退改票規定 Modal ── -->
+<div class="modal-overlay" id="rules-modal">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-title" id="rules-modal-title">乘車規則</div>
+    <div id="rules-modal-body" style="font-size:13px;color:var(--color-text-sub);line-height:2;max-height:60vh;overflow-y:auto;"></div>
+    <div class="modal-btn-row" style="margin-top:16px;">
+      <button class="btn-link" onclick="document.getElementById('rules-modal').classList.remove('open')">關閉</button>
     </div>
   </div>
 </div>
@@ -797,6 +808,46 @@ function confirmLink() {
   if (!tripId) { alert('請選擇行程'); return; }
   if (lastTicketId) linkTicketToTrip(lastTicketId, tripId);
   document.getElementById('link-trip-modal').classList.remove('open');
+}
+
+/* ── 乘車規則 / 退改票規定 Modal ── */
+const RULES_CONTENT = {
+  riding: {
+    title: '🚆 乘車規則',
+    body: `<ul style="padding-left:18px;margin:0;">
+      <li>請於列車到站前完成驗票，持 QR Code 或紙本票券進站。</li>
+      <li>對號座票依車廂座位乘坐，自由座可在任一自由座車廂乘坐。</li>
+      <li>6 歲以下孩童無需購票，惟需由家長陪同。</li>
+      <li>學生票、敬老票、愛心票須出示相關證件配合查驗。</li>
+      <li>嚴禁在車廂內吸菸、飲食（飲用瓶裝水除外）。</li>
+      <li>攜帶寵物須使用符合規定的攜帶箱並放置於行李架。</li>
+      <li>每人限攜帶行李三件，尺寸合計不超過 158 公分。</li>
+    </ul>`
+  },
+  refund: {
+    title: '🔄 退改票規定',
+    body: `<strong>退票</strong>
+    <ul style="padding-left:18px;margin:6px 0 14px;">
+      <li>開車前 1 小時以前退票：退全額，免手續費。</li>
+      <li>開車前 1 小時以內退票：退 50%，扣手續費 50%。</li>
+      <li>開車後不得退票。</li>
+    </ul>
+    <strong>改票</strong>
+    <ul style="padding-left:18px;margin:6px 0;">
+      <li>每次改票加收手續費 NT$10。</li>
+      <li>可更改乘車日期，車次以相同方向、相同站點為限。</li>
+      <li>開車後不得改票。</li>
+      <li>已使用之票券不得退改。</li>
+    </ul>`
+  }
+};
+
+function openRulesModal(type) {
+  const r = RULES_CONTENT[type];
+  if (!r) return;
+  document.getElementById('rules-modal-title').textContent = r.title;
+  document.getElementById('rules-modal-body').innerHTML    = r.body;
+  document.getElementById('rules-modal').classList.add('open');
 }
 
 /* ── 初始化 ── */
