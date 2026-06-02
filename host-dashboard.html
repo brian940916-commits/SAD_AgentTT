@@ -747,6 +747,7 @@
           <div style="display:flex;align-items:center;gap:var(--space-md);">
             <span class="badge ${statusMap[b.status] || ''}">${statusLbl[b.status] || b.status}</span>
             <div class="order-row-price">NT$ ${(b.totalPrice || 0).toLocaleString()}</div>
+            ${(b.status === 'paid' || b.status === 'pending') ? `<button class="btn btn-primary btn-sm" onclick="markOrderCompleted('${escHtml(b.id)}')">✅ 標記為完成</button>` : ''}
             <button class="btn btn-outline btn-sm" onclick="openOrderDetail('${escHtml(b.id)}')">查看詳情</button>
           </div>
         </div>`).join('');
@@ -779,8 +780,6 @@
             <td style="padding:8px 0;">${val}</td>
           </tr>`).join('')}
       </table>`;
-    const completeBtn = document.getElementById('order-complete-btn');
-    completeBtn.style.display = (b.status === 'paid' || b.status === 'pending') ? 'inline-flex' : 'none';
     document.getElementById('order-detail-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
@@ -789,14 +788,12 @@
     document.body.style.overflow = '';
     detailBookingId = null;
   }
-  function markOrderCompleted() {
-    if (!detailBookingId) return;
-    const b = hostBookings.find(x => x.id === detailBookingId);
+  function markOrderCompleted(bookingId) {
+    const b = hostBookings.find(x => x.id === bookingId);
     if (!b) return;
     b.status = 'completed';
     saveBooking(b);
     hostBookings = getBookings().filter(bk => hostProps.map(p => p.id).includes(bk.propertyId));
-    closeOrderDetail();
     renderHostOrders();
     showToast('✅ 訂單已標記為完成');
   }
@@ -941,7 +938,6 @@
     </div>
     <div class="order-modal-body" id="order-detail-body" style="line-height:1.8;font-size:14px;"></div>
     <div class="order-modal-foot">
-      <button class="btn btn-primary" id="order-complete-btn" onclick="markOrderCompleted()" style="display:none;">✅ 標記為完成</button>
       <button class="btn btn-outline" onclick="closeOrderDetail()">關閉</button>
     </div>
   </div>
