@@ -281,6 +281,30 @@
   </div>
 </div>
 
+<!-- ── 加入行程 Modal ── -->
+<div class="modal-overlay" id="link-trip-modal" role="dialog" aria-modal="true" aria-label="加入行程">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">🗓️ 加入行程</div>
+      <button class="modal-close" onclick="closeLinkTrip()" aria-label="關閉">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="link-trip-booking-info" style="margin-bottom:var(--space-md);"></div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">選擇行程</label>
+        <div id="link-trip-list" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
+        <div id="link-trip-empty" style="display:none;font-size:13px;color:var(--color-text-sub);padding:var(--space-md) 0;">
+          目前沒有規劃中的行程。<a href="trip-list.html" style="color:var(--color-primary);">前往建立行程 →</a>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeLinkTrip()">取消</button>
+      <button class="btn btn-primary" onclick="confirmLinkTrip()">確認加入</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -400,6 +424,15 @@
     }
     if (b.status !== 'cancelled') {
       actions += `<button class="btn btn-outline btn-sm" onclick="openContact('${escHtml(b.id)}')">💬 聯絡房東</button>`;
+    }
+    if (b.status !== 'cancelled') {
+      if (b.linkedTripId) {
+        const linkedTrip = getTripsByUser(currentUser.id).find(t => t.id === b.linkedTripId);
+        const tripName = linkedTrip ? escHtml(linkedTrip.name) : '行程';
+        actions += `<button class="btn btn-outline btn-sm" style="color:var(--color-success-text);border-color:var(--color-success-text);" onclick="openLinkTrip('${escHtml(b.id)}')">🗓️ ${tripName}</button>`;
+      } else {
+        actions += `<button class="btn btn-outline btn-sm" onclick="openLinkTrip('${escHtml(b.id)}')">🗓️ 加入行程</button>`;
+      }
     }
 
     const nights  = b.nights || Math.round((checkOut - checkIn) / 86400000);
@@ -700,6 +733,78 @@
 
     closeContact();
     showToast('✅ 訊息已送出，房東將盡快回覆');
+  }
+
+  /* ════════════════════════════════
+     加入行程 Modal
+  ════════════════════════════════ */
+  let linkTripBooking = null;
+  let selectedLinkTripId = null;
+
+  function openLinkTrip(bookingId) {
+    linkTripBooking = allBookings.find(b => b.id === bookingId);
+    if (!linkTripBooking) return;
+
+    document.getElementById('link-trip-booking-info').innerHTML = `
+      <div style="background:var(--color-secondary);border-radius:var(--radius-md);padding:var(--space-md);">
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px;">${escHtml(linkTripBooking.propertyName)}</div>
+        <div style="font-size:13px;color:var(--color-text-sub);">📅 ${escHtml(linkTripBooking.checkIn)} — ${escHtml(linkTripBooking.checkOut)}</div>
+      </div>`;
+
+    const trips = getTripsByUser(currentUser.id).filter(t => t.status === 'planning');
+    selectedLinkTripId = linkTripBooking.linkedTripId || null;
+
+    const listEl = document.getElementById('link-trip-list');
+    const emptyEl = document.getElementById('link-trip-empty');
+    if (!trips.length) {
+      listEl.style.display = 'none';
+      emptyEl.style.display = 'block';
+      document.querySelector('#link-trip-modal .btn-primary').disabled = true;
+    } else {
+      listEl.style.display = 'flex';
+      emptyEl.style.display = 'none';
+      document.querySelector('#link-trip-modal .btn-primary').disabled = false;
+      listEl.innerHTML = trips.map(t => {
+        const isSelected = t.id === selectedLinkTripId;
+        return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border-light)'};border-radius:var(--radius-md);cursor:pointer;background:${isSelected ? 'var(--color-secondary)' : '#fff'};" onclick="selectLinkTrip('${escHtml(t.id)}')">
+          <input type="radio" name="link-trip-radio" value="${escHtml(t.id)}" ${isSelected ? 'checked' : ''} style="accent-color:var(--color-primary);">
+          <div>
+            <div style="font-size:14px;font-weight:600;">${escHtml(t.name)}</div>
+            <div style="font-size:12px;color:var(--color-text-sub);">📅 ${escHtml(t.startDate)} — ${escHtml(t.endDate)}</div>
+          </div>
+        </label>`;
+      }).join('');
+    }
+
+    document.getElementById('link-trip-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function selectLinkTrip(tripId) {
+    selectedLinkTripId = tripId;
+    document.querySelectorAll('#link-trip-list label').forEach(el => {
+      const radio = el.querySelector('input[type=radio]');
+      const picked = radio.value === tripId;
+      radio.checked = picked;
+      el.style.borderColor = picked ? 'var(--color-primary)' : 'var(--color-border-light)';
+      el.style.background  = picked ? 'var(--color-secondary)' : '#fff';
+    });
+  }
+
+  function closeLinkTrip() {
+    document.getElementById('link-trip-modal').classList.remove('open');
+    document.body.style.overflow = '';
+    linkTripBooking = null;
+    selectedLinkTripId = null;
+  }
+
+  function confirmLinkTrip() {
+    if (!linkTripBooking || !selectedLinkTripId) return;
+    linkBookingToTrip(linkTripBooking.id, selectedLinkTripId);
+    allBookings = getBookingsByUser(currentUser.id);
+    closeLinkTrip();
+    renderList();
+    showToast('✅ 已加入行程');
   }
 </script>
 </body>
