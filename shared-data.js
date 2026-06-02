@@ -17,7 +17,6 @@ const KEYS = {
   PROPERTIES:     'agenttt_properties',
   FAVORITES:      'agenttt_favorites',
   MESSAGES:       'agenttt_messages',
-  SETTINGS:       'agenttt_settings',
   REVIEWS:        'agenttt_reviews',
 };
 
@@ -401,15 +400,6 @@ function toggleFavorite(propertyId) {
   return idx < 0;
 }
 
-/* ── 設定 ────────────────────────────────────────────────── */
-
-function getSettings() {
-  return getData(KEYS.SETTINGS) || { maxPriceLimit: 10000 };
-}
-
-function saveSettings(settings) {
-  setData(KEYS.SETTINGS, settings);
-}
 
 /* ── 評價 ────────────────────────────────────────────────── */
 
@@ -745,8 +735,6 @@ function init() {
     },
   ]);
 
-  /* 設定 */
-  setData(KEYS.SETTINGS, { maxPriceLimit: 10000 });
 
   /* 標記初始化完成 */
   setData('agenttt_initialized', true);

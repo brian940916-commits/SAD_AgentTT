@@ -76,11 +76,6 @@
     .modal-body  { padding: var(--space-lg); }
     .modal-foot  { padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--color-border-light); display: flex; gap: var(--space-sm); justify-content: flex-end; }
 
-    /* ── 價格上限 ── */
-    .price-limit-card { background: #fff; border: 1px solid var(--color-border-light); border-radius: var(--radius-lg); padding: var(--space-xl); max-width: 440px; }
-    .price-limit-current { font-size: 36px; font-weight: 700; color: var(--color-primary); margin: var(--space-md) 0; }
-    .price-limit-row { display: flex; gap: var(--space-md); align-items: flex-end; }
-    .price-limit-row .form-group { flex: 1; margin: 0; }
 
     /* ── 訂單列表 ── */
     .conflict-row { border-left: 4px solid var(--color-accent-red) !important; }
@@ -164,9 +159,6 @@
           <span class="sidebar-icon">🏠</span>房源審核
           <span class="sidebar-badge" id="badge-review">0</span>
         </div>
-        <div class="sidebar-item" data-sec="price"   onclick="showSec('price')">
-          <span class="sidebar-icon">💰</span>價格上限
-        </div>
         <div class="sidebar-item" data-sec="orders"  onclick="showSec('orders')">
           <span class="sidebar-icon">📋</span>全平台訂單
         </div>
@@ -192,33 +184,6 @@
           <div id="review-list"><!-- 動態填入 --></div>
         </div>
 
-        <!-- §2 價格上限 -->
-        <div class="section-page" id="sec-price">
-          <div class="page-title-row">
-            <div class="page-title">價格上限管理</div>
-          </div>
-          <div class="price-limit-card">
-            <div style="font-size:14px;color:var(--color-text-sub);">目前全平台最高售價上限</div>
-            <div class="price-limit-current" id="current-limit">NT$ 0</div>
-            <div style="font-size:13px;color:var(--color-text-sub);margin-bottom:var(--space-md);">超過此上限的房源將無法上架。設定後立即生效。</div>
-            <div class="price-limit-row">
-              <div class="form-group">
-                <label class="form-label">新上限（NT$）</label>
-                <input class="form-input" type="number" id="new-limit" min="0" step="100" placeholder="例：10000">
-              </div>
-              <button class="btn btn-primary" onclick="savePriceLimit()">儲存</button>
-            </div>
-            <div style="margin-top:var(--space-xl);">
-              <div style="font-size:13px;font-weight:600;margin-bottom:var(--space-sm);">常用上限快速設定</div>
-              <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
-                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(5000)">NT$ 5,000</button>
-                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(8000)">NT$ 8,000</button>
-                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(10000)">NT$ 10,000</button>
-                <button class="btn btn-outline btn-sm" onclick="setQuickLimit(15000)">NT$ 15,000</button>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- §3 全平台訂單 -->
         <div class="section-page" id="sec-orders">
@@ -377,7 +342,6 @@
 
     updateBadges();
     renderPendingProps();
-    renderPriceLimit();
     renderAllOrders();
     renderAllReviews();
     renderCsList();
@@ -509,28 +473,6 @@
     showToast('房源已退件，通知已發送至房東');
   }
 
-  /* ════════════════════════════════
-     §2 價格上限
-  ════════════════════════════════ */
-  function renderPriceLimit() {
-    const s = getSettings();
-    const lim = s.maxPriceLimit || 10000;
-    document.getElementById('current-limit').textContent = `NT$ ${lim.toLocaleString()}`;
-    document.getElementById('new-limit').value = lim;
-  }
-  function savePriceLimit() {
-    const val = Number(document.getElementById('new-limit').value);
-    if (!val || val < 0) { showToast('⚠️ 請輸入有效金額'); return; }
-    const s = getSettings();
-    s.maxPriceLimit = val;
-    saveSettings(s);
-    renderPriceLimit();
-    showToast(`✅ 價格上限已更新為 NT$ ${val.toLocaleString()}`);
-  }
-  function setQuickLimit(val) {
-    document.getElementById('new-limit').value = val;
-    savePriceLimit();
-  }
 
   /* ════════════════════════════════
      §3 全平台訂單
