@@ -154,6 +154,10 @@
     .success-item-name { font-size: 14px; font-weight: 600; color: var(--color-text-main); }
     .success-item-meta { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
 
+    /* Toast */
+    .cart-toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #2C4A3E; color: #fff; padding: 11px 26px; border-radius: 99px; font-size: 13px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 9999; white-space: nowrap; }
+    .cart-toast.show { opacity: 1; }
+
     /* 空購物車 */
     .empty-cart { text-align: center; padding: var(--space-3xl); color: var(--color-text-light); }
     .empty-cart-icon { font-size: 56px; margin-bottom: var(--space-md); }  </style>
@@ -184,6 +188,8 @@
   </div>
 </div>
 
+<div class="cart-toast" id="cart-toast"></div>
+
 <div id="footer-container"></div>
 
 <!-- ── 連結行程 Modal ── -->
@@ -193,10 +199,22 @@
     <div style="font-size:13px;color:var(--color-text-sub);margin-bottom:18px;line-height:1.7;">
       要將這次訂房加入您的行程嗎？方便在行程規劃頁統一管理所有安排，並啟用衝突偵測功能。
     </div>
-    <select id="booking-trip-select" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid var(--color-border);border-radius:var(--radius-md);font-family:var(--font-main);font-size:14px;margin-bottom:16px;outline:none;"></select>
-    <div style="display:flex;gap:10px;">
-      <button onclick="skipBookingLink()" style="flex:1;padding:10px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-bg);border:1px solid var(--color-border);color:var(--color-text-sub);">暫不加入</button>
-      <button onclick="confirmBookingLink()" style="flex:1;padding:10px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-primary);color:#fff;border:none;">加入行程</button>
+    <div id="link-trip-body">
+      <select id="booking-trip-select" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid var(--color-border);border-radius:var(--radius-md);font-family:var(--font-main);font-size:14px;margin-bottom:16px;outline:none;"></select>
+      <div style="display:flex;gap:10px;">
+        <button onclick="skipBookingLink()" style="flex:1;padding:10px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-bg);border:1px solid var(--color-border);color:var(--color-text-sub);">暫不加入</button>
+        <button onclick="confirmBookingLink()" style="flex:1;padding:10px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-primary);color:#fff;border:none;">加入行程</button>
+      </div>
+    </div>
+    <div id="link-trip-empty" style="display:none;">
+      <div style="text-align:center;padding:8px 0 18px;">
+        <div style="font-size:36px;margin-bottom:10px;">📋</div>
+        <div style="font-size:14px;color:var(--color-text-sub);margin-bottom:16px;line-height:1.8;">目前沒有進行中的行程<br>請先建立行程再連結訂房</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button onclick="skipBookingLink()" style="padding:10px 20px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-bg);border:1px solid var(--color-border);color:var(--color-text-sub);">略過</button>
+          <a href="trip-list.html" style="padding:10px 20px;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:var(--font-main);cursor:pointer;background:var(--color-primary);color:#fff;text-decoration:none;">前往建立行程</a>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -713,18 +731,32 @@
     renderStep();
   }
 
+  /* ── Toast ── */
+  function showCartToast(msg, ms = 2500) {
+    const el = document.getElementById('cart-toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), ms);
+  }
+
   /* ── 連結訂房到行程 ── */
   function showLinkBookingModal() {
     const trips = getTrips().filter(t => t.ownerId === currentUser.id && t.status !== 'cancelled');
     const sel   = document.getElementById('booking-trip-select');
+    const bodyEl  = document.getElementById('link-trip-body');
+    const emptyEl = document.getElementById('link-trip-empty');
+
     if (!trips.length) {
-      alert('您目前沒有進行中的行程，請先至「行程規劃」建立行程。');
-      return;
+      bodyEl.style.display  = 'none';
+      emptyEl.style.display = 'block';
+    } else {
+      bodyEl.style.display  = 'block';
+      emptyEl.style.display = 'none';
+      sel.innerHTML = '<option value="">— 選擇行程 —</option>' +
+        trips.map(t => `<option value="${escHtml(t.id)}">${escHtml(t.name)}（${escHtml(t.startDate)} — ${escHtml(t.endDate)}）</option>`).join('');
     }
-    sel.innerHTML = '<option value="">— 選擇行程 —</option>' +
-      trips.map(t => `<option value="${escHtml(t.id)}">${escHtml(t.name)}（${escHtml(t.startDate)} — ${escHtml(t.endDate)}）</option>`).join('');
-    const modal = document.getElementById('link-trip-modal');
-    modal.style.display = 'flex';
+
+    document.getElementById('link-trip-modal').style.display = 'flex';
   }
 
   function skipBookingLink() {
@@ -733,10 +765,10 @@
 
   function confirmBookingLink() {
     const tripId = document.getElementById('booking-trip-select').value;
-    if (!tripId) { alert('請選擇一個行程'); return; }
+    if (!tripId) { showCartToast('⚠️ 請先選擇一個行程'); return; }
     savedBookings.forEach(b => linkBookingToTrip(b.id, tripId));
     document.getElementById('link-trip-modal').style.display = 'none';
-    alert(`已成功將 ${savedBookings.length} 筆訂房加入行程！`);
+    showCartToast(`✅ 已將 ${savedBookings.length} 筆訂房加入行程！`);
   }
 
   init();
