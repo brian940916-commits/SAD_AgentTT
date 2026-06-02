@@ -134,6 +134,16 @@
     .order-row-meta { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
     .order-row-price { font-size: 16px; font-weight: 700; color: var(--color-primary); flex-shrink: 0; }
 
+    /* ── 訂單詳情 Modal ── */
+    .order-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 500; display: none; align-items: center; justify-content: center; }
+    .order-modal-overlay.open { display: flex; }
+    .order-modal-box { background: #fff; border-radius: var(--radius-xl); width: 90%; max-width: 480px; box-shadow: var(--shadow-modal); }
+    .order-modal-head { padding: var(--space-lg); border-bottom: 1px solid var(--color-border-light); display: flex; align-items: center; justify-content: space-between; }
+    .order-modal-title { font-size: 17px; font-weight: 700; }
+    .order-modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--color-text-sub); }
+    .order-modal-body  { padding: var(--space-lg); }
+    .order-modal-foot  { padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--color-border-light); display: flex; justify-content: flex-end; }
+
     /* ── 顧客訊息 ── */
     .chat-layout { display: grid; grid-template-columns: 220px 1fr; gap: 0; background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); overflow: hidden; height: 540px; }
     .conv-list { border-right: 1px solid var(--color-border-light); overflow-y: auto; }
@@ -737,8 +747,41 @@
           <div style="display:flex;align-items:center;gap:var(--space-md);">
             <span class="badge ${statusMap[b.status] || ''}">${statusLbl[b.status] || b.status}</span>
             <div class="order-row-price">NT$ ${(b.totalPrice || 0).toLocaleString()}</div>
+            <button class="btn btn-outline btn-sm" onclick="openOrderDetail('${escHtml(b.id)}')">查看詳情</button>
           </div>
         </div>`).join('');
+  }
+
+  function openOrderDetail(bookingId) {
+    const b = hostBookings.find(x => x.id === bookingId);
+    if (!b) return;
+    const statusLbl = { paid:'已付款', pending:'待付款', cancelled:'已取消', completed:'已完成' };
+    document.getElementById('order-detail-body').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;">
+        ${[
+          ['訂單編號', escHtml(b.id)],
+          ['房源名稱', escHtml(b.propertyName)],
+          ['入住日期', escHtml(b.checkIn)],
+          ['退房日期', escHtml(b.checkOut)],
+          ['住宿晚數', `${b.nights || 1} 晚`],
+          ['旅客姓名', escHtml(b.guestName || '—')],
+          ['手機號碼', escHtml(b.guestPhone || '—')],
+          ['Email',    escHtml(b.guestEmail || '—')],
+          ['備註',     escHtml(b.note || '—')],
+          ['金額',     `NT$ ${(b.totalPrice || 0).toLocaleString()}`],
+          ['狀態',     statusLbl[b.status] || b.status],
+        ].map(([label, val]) => `
+          <tr style="border-bottom:1px solid #f0ede5;">
+            <td style="padding:8px 12px 8px 0;font-weight:600;color:#666;white-space:nowrap;width:80px;">${label}</td>
+            <td style="padding:8px 0;">${val}</td>
+          </tr>`).join('')}
+      </table>`;
+    document.getElementById('order-detail-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeOrderDetail() {
+    document.getElementById('order-detail-modal').classList.remove('open');
+    document.body.style.overflow = '';
   }
 
   /* ════════════════════════════════
@@ -871,5 +914,19 @@
 
   init();
 </script>
+
+<!-- 訂單詳情 Modal -->
+<div class="order-modal-overlay" id="order-detail-modal">
+  <div class="order-modal-box">
+    <div class="order-modal-head">
+      <div class="order-modal-title">📋 訂單詳情</div>
+      <button class="order-modal-close" onclick="closeOrderDetail()">✕</button>
+    </div>
+    <div class="order-modal-body" id="order-detail-body" style="line-height:1.8;font-size:14px;"></div>
+    <div class="order-modal-foot">
+      <button class="btn btn-outline" onclick="closeOrderDetail()">關閉</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

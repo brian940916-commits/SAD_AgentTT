@@ -34,7 +34,6 @@
       font-size: 10px; font-weight: 700; padding: 2px 6px;
       border-radius: var(--radius-xl); flex-shrink: 0;
     }
-
     /* ── 右側主內容 ── */
     .main-content { flex: 1; background: #f5f3ef; min-width: 0; }
     .main-inner   { padding: var(--space-xl); }
@@ -271,6 +270,20 @@
   </div>
 </div>
 
+<!-- 房源詳情 Modal -->
+<div class="modal-overlay" id="prop-detail-modal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-head">
+      <div class="modal-title">🏠 房源詳情</div>
+      <button class="modal-close" onclick="closePropDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="prop-detail-body" style="line-height:1.8;font-size:14px;"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closePropDetail()">關閉</button>
+    </div>
+  </div>
+</div>
+
 <!-- 退件 Modal -->
 <div class="modal-overlay" id="reject-modal" role="dialog" aria-modal="true">
   <div class="modal-box">
@@ -417,6 +430,7 @@
                 ${p.description ? escHtml(p.description.slice(0, 60)) + '…' : ''}
               </div>
               <div class="card-actions">
+                <button class="btn btn-outline btn-sm" onclick="openPropDetail('${escHtml(p.id)}')">🔍 查看詳情</button>
                 <button class="btn btn-primary btn-sm" onclick="approveProp('${escHtml(p.id)}')">✅ 審核通過</button>
                 <button class="btn btn-danger btn-sm"  onclick="openRejectModal('${escHtml(p.id)}','${escHtml(p.name)}')">❌ 退件</button>
               </div>
@@ -433,6 +447,38 @@
     updateBadges();
     renderPendingProps();
     showToast('✅ 房源已審核通過，即刻上線');
+  }
+
+  function openPropDetail(propId) {
+    const p = getProperties().find(x => x.id === propId);
+    if (!p) return;
+    const facilities = (p.facilities || []).join('、') || '—';
+    document.getElementById('prop-detail-body').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;">
+        ${[
+          ['房源名稱', escHtml(p.name)],
+          ['所在車站', escHtml(p.station)],
+          ['房型',     escHtml(p.roomType)],
+          ['最多人數', `${p.maxGuests} 人`],
+          ['平日價格', `NT$ ${(p.priceWeekday||0).toLocaleString()}`],
+          ['假日價格', `NT$ ${(p.priceWeekend||0).toLocaleString()}`],
+          ['假期價格', `NT$ ${(p.priceHoliday||0).toLocaleString()}`],
+          ['入住時間', escHtml(p.checkInTime||'—')],
+          ['退房時間', escHtml(p.checkOutTime||'—')],
+          ['設備',     escHtml(facilities)],
+          ['描述',     escHtml(p.description||'—')],
+        ].map(([label, val]) => `
+          <tr style="border-bottom:1px solid #f0ede5;">
+            <td style="padding:8px 12px 8px 0;font-weight:600;color:#666;white-space:nowrap;width:90px;">${label}</td>
+            <td style="padding:8px 0;">${val}</td>
+          </tr>`).join('')}
+      </table>`;
+    document.getElementById('prop-detail-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closePropDetail() {
+    document.getElementById('prop-detail-modal').classList.remove('open');
+    document.body.style.overflow = '';
   }
 
   function openRejectModal(propId, propName) {

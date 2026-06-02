@@ -829,10 +829,16 @@ function hashNum(str) {
   for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0xfffff;
   return h;
 }
-function getTrainStatus(trainNo, dH, dM) {
-  const now  = new Date();
-  const nowM = now.getHours() * 60 + now.getMinutes();
-  if (dH * 60 + dM < nowM) return { label:'已過站', cls:'status-passed', passed:true };
+function getTrainStatus(trainNo, dH, dM, date) {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm   = String(now.getMonth() + 1).padStart(2, '0');
+  const dd   = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+  if (date === todayStr) {
+    const nowM = now.getHours() * 60 + now.getMinutes();
+    if (dH * 60 + dM < nowM) return { label:'已過站', cls:'status-passed', passed:true };
+  }
   const h = hashNum(trainNo);
   if (h % 5 === 0) return { label:'誤點 ' + ((h % 3 + 1) * 5) + ' 分', cls:'status-delayed', passed:false };
   return { label:'準點', cls:'status-ontime', passed:false };
@@ -879,7 +885,7 @@ function jijiCardHTML(t, from, to, date) {
     trainType1: '普快車', total: price
   });
   const [dH, dM] = t.depart.split(':').map(Number);
-  const st  = getTrainStatus(t.trainNo, dH, dM);
+  const st  = getTrainStatus(t.trainNo, dH, dM, date);
   const sid = 'j' + t.trainNo;
   const bookBtn = st.passed
     ? `<button class="book-btn" disabled style="opacity:.45;cursor:not-allowed;">已過站</button>`
@@ -918,7 +924,7 @@ function directCardHTML(t, from, to, date) {
     trainNo1: t.trainNo, depart1: departStr, arrive1: arriveStr, price1: t.price,
     trainType1: t.type, total: t.price
   });
-  const st    = getTrainStatus(t.trainNo, t.departH, t.departM);
+  const st    = getTrainStatus(t.trainNo, t.departH, t.departM, date);
   const stops = WEST_STOPS[t.typeKey] || WEST_STOPS.local;
   const sid   = 'd' + t.trainNo;
   const bookBtn = st.passed

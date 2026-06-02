@@ -74,6 +74,16 @@
       transition: all var(--transition); font-family: var(--font-main);
     }
     .day-tab-add:hover { color: var(--color-primary); border-color: var(--color-primary); }
+    .day-tab-del {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; border-radius: 50%;
+      font-size: 10px; font-weight: 700; line-height: 1;
+      background: none; border: none; cursor: pointer;
+      color: var(--color-text-light); margin-left: 6px;
+      transition: background var(--transition), color var(--transition);
+      flex-shrink: 0; padding: 0; font-family: var(--font-main);
+    }
+    .day-tab-del:hover { background: var(--color-accent-red); color: #fff; }
 
     /* ── 主內容 ── */
     .content-area { padding: var(--space-lg) 0 var(--space-3xl); }
@@ -532,6 +542,9 @@ function renderDayTabs() {
   let html = '';
   for (let i = 1; i <= days; i++) {
     const dateStr = fmtDate(getDateForDay(i));
+    const delBtn  = days > 1
+      ? `<span class="day-tab-del" onclick="event.stopPropagation();deleteDay(${i})" title="刪除此天">✕</span>`
+      : '';
     html += `
       <button class="day-tab${i === currentDay ? ' active' : ''}"
               data-day="${i}"
@@ -540,10 +553,10 @@ function renderDayTabs() {
               ondragover="onDayTabDragOver(event,${i})"
               ondragleave="onDayTabDragLeave(event,${i})"
               ondrop="onDayTabDrop(event,${i})">
-        Day ${i} <span style="font-weight:400;opacity:0.7;font-size:11px;margin-left:4px;">${dateStr}</span>
+        Day ${i} <span style="font-weight:400;opacity:0.7;font-size:11px;margin-left:4px;">${dateStr}</span>${delBtn}
       </button>`;
   }
-  html += `<button class="day-tab-add" onclick="addDay()" title="新增天數">＋ 新增天</button>`;
+  html += `<button class="day-tab-add" onclick="addDay()" title="新增天數">＋ 新增日期</button>`;
   tabEl.innerHTML = html;
 }
 
@@ -565,6 +578,30 @@ function addDay() {
   renderDayTabs();
   switchDay(getDayCount(tripData));
   showToast('已新增一天', 'success');
+}
+
+function deleteDay(day) {
+  if (getDayCount(tripData) <= 1) { showToast('至少保留 1 天', ''); return; }
+  if (!confirm(`確認刪除 Day ${day}（${fmtDate(getDateForDay(day))}）及其所有行程項目？`)) return;
+
+  tripData.items = (tripData.items || []).filter(i => i.day !== day);
+  (tripData.items || []).forEach(i => { if (i.day > day) i.day--; });
+
+  const end = new Date(tripData.endDate + 'T00:00:00');
+  end.setDate(end.getDate() - 1);
+  const yyyy = end.getFullYear();
+  const mm = String(end.getMonth() + 1).padStart(2, '0');
+  const dd = String(end.getDate()).padStart(2, '0');
+  tripData.endDate = `${yyyy}-${mm}-${dd}`;
+
+  saveTrip(tripData);
+  const newTotal = getDayCount(tripData);
+  if (currentDay > newTotal) currentDay = newTotal;
+  else if (currentDay >= day && currentDay > 1) currentDay--;
+  renderHeader();
+  renderDayTabs();
+  renderDayContent(currentDay);
+  showToast(`已刪除 Day ${day}`, 'success');
 }
 
 /* ══════════════════════════════════════════════
