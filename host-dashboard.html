@@ -752,9 +752,12 @@
         </div>`).join('');
   }
 
+  let detailBookingId = null;
+
   function openOrderDetail(bookingId) {
     const b = hostBookings.find(x => x.id === bookingId);
     if (!b) return;
+    detailBookingId = bookingId;
     const statusLbl = { paid:'已付款', pending:'待付款', cancelled:'已取消', completed:'已完成' };
     document.getElementById('order-detail-body').innerHTML = `
       <table style="width:100%;border-collapse:collapse;">
@@ -776,12 +779,26 @@
             <td style="padding:8px 0;">${val}</td>
           </tr>`).join('')}
       </table>`;
+    const completeBtn = document.getElementById('order-complete-btn');
+    completeBtn.style.display = (b.status === 'paid' || b.status === 'pending') ? 'inline-flex' : 'none';
     document.getElementById('order-detail-modal').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
   function closeOrderDetail() {
     document.getElementById('order-detail-modal').classList.remove('open');
     document.body.style.overflow = '';
+    detailBookingId = null;
+  }
+  function markOrderCompleted() {
+    if (!detailBookingId) return;
+    const b = hostBookings.find(x => x.id === detailBookingId);
+    if (!b) return;
+    b.status = 'completed';
+    saveBooking(b);
+    hostBookings = getBookings().filter(bk => hostProps.map(p => p.id).includes(bk.propertyId));
+    closeOrderDetail();
+    renderHostOrders();
+    showToast('✅ 訂單已標記為完成');
   }
 
   /* ════════════════════════════════
@@ -924,6 +941,7 @@
     </div>
     <div class="order-modal-body" id="order-detail-body" style="line-height:1.8;font-size:14px;"></div>
     <div class="order-modal-foot">
+      <button class="btn btn-primary" id="order-complete-btn" onclick="markOrderCompleted()" style="display:none;">✅ 標記為完成</button>
       <button class="btn btn-outline" onclick="closeOrderDetail()">關閉</button>
     </div>
   </div>

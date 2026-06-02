@@ -662,6 +662,30 @@
     const msg = document.getElementById('contact-msg').value.trim();
     if (!msg) { document.getElementById('contact-err').style.display = 'block'; return; }
     document.getElementById('contact-err').style.display = 'none';
+
+    const prop = getPropertyById(contactBooking.propertyId);
+    const hostId = prop ? prop.hostId : null;
+    const convKey = 'agenttt_messages';
+    let convs = [];
+    try { convs = JSON.parse(localStorage.getItem(convKey) || '[]'); } catch { convs = []; }
+
+    const convId = 'conv_' + contactBooking.id;
+    let conv = convs.find(c => c.id === convId);
+    if (!conv) {
+      conv = {
+        id:           convId,
+        hostId:       hostId,
+        guestId:      currentUser.id,
+        guestName:    currentUser.name || currentUser.email,
+        propertyId:   contactBooking.propertyId,
+        propertyName: contactBooking.propertyName,
+        messages:     [],
+      };
+      convs.push(conv);
+    }
+    conv.messages.push({ sender: 'guest', text: msg, createdAt: new Date().toISOString() });
+    localStorage.setItem(convKey, JSON.stringify(convs));
+
     closeContact();
     showToast('✅ 訊息已送出，房東將盡快回覆');
   }
