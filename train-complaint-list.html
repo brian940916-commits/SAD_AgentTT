@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent TT — 我的客訴</title>
+  <link rel="stylesheet" href="shared-styles.css">
+  <style>
+    .page-header {
+      padding: var(--space-xl) 0 var(--space-md);
+      border-bottom: 1px solid var(--color-border-light);
+      margin-bottom: var(--space-xl);
+    }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--color-text-main); }
+    .content-area { padding-bottom: var(--space-3xl); }
+
+    /* 客訴卡片 */
+    .complaint-card {
+      background: #fff;
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: var(--space-md);
+      transition: box-shadow .15s;
+    }
+    .complaint-card:hover { box-shadow: var(--shadow-card); }
+    .complaint-card-body {
+      display: flex; gap: var(--space-md);
+      padding: var(--space-md); align-items: flex-start;
+    }
+    .complaint-icon {
+      width: 52px; height: 52px; border-radius: var(--radius-md);
+      background: #FFF8E6; display: flex; align-items: center;
+      justify-content: center; font-size: 26px; flex-shrink: 0;
+    }
+    .complaint-info { flex: 1; min-width: 0; }
+    .complaint-top-row {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: var(--space-sm);
+      margin-bottom: 6px;
+    }
+    .complaint-title { font-size: 15px; font-weight: 700; color: var(--color-text-main); }
+    .complaint-meta  { font-size: 13px; color: var(--color-text-sub); line-height: 1.8; }
+    .complaint-desc  {
+      font-size: 13px; color: var(--color-text-sub);
+      margin-top: 6px; overflow: hidden;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+
+    /* 狀態標籤 */
+    .status-badge {
+      font-size: 12px; font-weight: 600; padding: 3px 10px;
+      border-radius: var(--radius-xl); white-space: nowrap; flex-shrink: 0;
+    }
+    .status-pending  { background: #FFF8E6; color: #7A5A1A; }
+    .status-active   { background: var(--color-success); color: var(--color-success-text); }
+    .status-closed   { background: #EEE; color: #757575; }
+
+    /* 卡片底部 */
+    .complaint-card-foot {
+      padding: 10px var(--space-md);
+      background: var(--color-secondary);
+      border-top: 1px solid var(--color-border-light);
+      display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap; gap: var(--space-sm);
+    }
+    .case-no-text { font-size: 12px; color: var(--color-text-light); font-family: monospace; }
+    .card-actions { display: flex; gap: var(--space-sm); }
+    .btn-chat {
+      padding: 7px 16px; border-radius: var(--radius-md);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--color-primary);
+      background: #fff; color: var(--color-primary);
+      font-family: var(--font-main); transition: all .15s;
+    }
+    .btn-chat:hover { background: var(--color-primary); color: #fff; }
+    .btn-chat.active { background: var(--color-primary); color: #fff; }
+
+    /* 展開的對話區 */
+    .chat-panel {
+      display: none;
+      border-top: 1px solid var(--color-border-light);
+      background: #FAFBF9;
+    }
+    .chat-panel.open { display: block; }
+    .chat-panel-inner { padding: var(--space-md); max-width: 700px; margin: 0 auto; }
+
+    .chat-messages-list {
+      display: flex; flex-direction: column; gap: 10px;
+      min-height: 80px; max-height: 360px;
+      overflow-y: auto; margin-bottom: 14px;
+      padding: 4px 0;
+    }
+    .msg-bubble-wrap {
+      display: flex; flex-direction: column;
+    }
+    .msg-bubble-wrap.mine  { align-items: flex-end; }
+    .msg-bubble-wrap.theirs { align-items: flex-start; }
+
+    .msg-sender-label {
+      font-size: 11px; color: var(--color-text-light);
+      margin-bottom: 3px; padding: 0 4px;
+    }
+    .msg-bubble {
+      max-width: 75%; padding: 9px 13px;
+      border-radius: 16px; font-size: 14px; line-height: 1.6;
+      word-break: break-word; white-space: pre-wrap;
+    }
+    .msg-bubble.mine   { background: var(--color-primary); color: #fff; border-bottom-right-radius: 4px; }
+    .msg-bubble.theirs { background: #E8EDEB; color: var(--color-text-main); border-bottom-left-radius: 4px; }
+    .msg-time {
+      font-size: 11px; color: var(--color-text-light);
+      margin-top: 3px; padding: 0 4px;
+    }
+
+    .chat-input-row {
+      display: flex; gap: 8px; align-items: flex-end;
+    }
+    .chat-textarea {
+      flex: 1; resize: none; border-radius: var(--radius-md);
+      border: 1px solid var(--color-border-light);
+      padding: 9px 12px; font-size: 14px;
+      font-family: var(--font-main); line-height: 1.5;
+      min-height: 44px; max-height: 120px;
+      background: #fff; color: var(--color-text-main);
+      transition: border-color .15s;
+    }
+    .chat-textarea:focus { outline: none; border-color: var(--color-primary); }
+    .chat-textarea:disabled { background: #F5F5F5; color: var(--color-text-light); cursor: not-allowed; }
+    .btn-send {
+      padding: 9px 18px; background: var(--color-primary);
+      color: #fff; border: none; border-radius: var(--radius-md);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      font-family: var(--font-main); white-space: nowrap;
+      transition: opacity .15s;
+    }
+    .btn-send:disabled { opacity: .4; cursor: not-allowed; }
+    .chat-closed-tip {
+      text-align: center; font-size: 13px;
+      color: var(--color-text-light); padding: 10px 0;
+    }
+
+    /* 空狀態 */
+    .empty-state {
+      text-align: center; padding: var(--space-3xl) var(--space-xl);
+      color: var(--color-text-light);
+    }
+    .empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 15px; margin-bottom: 18px; }
+    .btn-primary {
+      display: inline-block; padding: 10px 24px;
+      background: var(--color-primary); color: #fff;
+      border-radius: var(--radius-md); font-size: 14px;
+      font-weight: 600; text-decoration: none; font-family: var(--font-main);
+    }
+  </style>
+</head>
+<body>
+<div id="nav-root"></div>
+
+<div class="container">
+  <div class="page-header">
+    <h1>💬 我的客訴</h1>
+  </div>
+  <div class="content-area">
+    <div id="complaint-list-root"></div>
+  </div>
+</div>
+
+<div id="footer-root"></div>
+
+<script src="shared-data.js"></script>
+<script src="shared-nav.js"></script>
+<script>
+  const currentUser = getCurrentUser();
+
+  if (!currentUser) {
+    location.href = 'login.html';
+  }
+
+  /* ── 工具函數 ── */
+  function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })
+      + ' ' + d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatDateShort(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1)  return '剛剛';
+    if (diffMin < 60) return `${diffMin} 分鐘前`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24)  return `${diffHr} 小時前`;
+    return d.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
+  }
+
+  function statusLabel(status) {
+    const map = { pending: '處理中', active: '回覆中', closed: '已結案' };
+    return map[status] || status;
+  }
+
+  /* ── 訊息顯示：相容 admin (content) 和 user (text) 兩種格式 ── */
+  function msgText(msg) {
+    return msg.text || msg.content || '';
+  }
+
+  /* 判斷訊息是否為目前 guest 自己發的 */
+  function isMine(msg) {
+    return msg.sender === 'user' || msg.senderId === currentUser.id || msg.userId === currentUser.id;
+  }
+
+  /* ── 展開狀態管理 ── */
+  const openPanels = new Set();
+  let pollTimers = {};
+
+  /* ── 渲染訊息列表 ── */
+  function renderMessages(panelEl, complaint) {
+    const msgList = panelEl.querySelector('.chat-messages-list');
+    const msgs = complaint.messages || [];
+    if (msgs.length === 0) {
+      msgList.innerHTML = '<div style="text-align:center;color:var(--color-text-light);font-size:13px;padding:20px 0;">尚無訊息，請在下方輸入您的問題。</div>';
+      return;
+    }
+    msgList.innerHTML = msgs.map(msg => {
+      const mine = isMine(msg);
+      const text = msgText(msg);
+      const senderLabel = mine ? '我' : '客服';
+      return `
+        <div class="msg-bubble-wrap ${mine ? 'mine' : 'theirs'}">
+          <div class="msg-sender-label">${senderLabel}</div>
+          <div class="msg-bubble ${mine ? 'mine' : 'theirs'}">${escapeHtml(text)}</div>
+          <div class="msg-time">${formatDateShort(msg.createdAt)}</div>
+        </div>`;
+    }).join('');
+    msgList.scrollTop = msgList.scrollHeight;
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /* ── 送出訊息 ── */
+  function sendComplaintMsg(complaintId, panelEl) {
+    const textarea = panelEl.querySelector('.chat-textarea');
+    const text = textarea.value.trim();
+    if (!text) return;
+
+    const c = getComplaintById(complaintId);
+    if (!c || c.status === 'closed') return;
+
+    c.messages = c.messages || [];
+    c.messages.push({
+      id:        generateId(),
+      sender:    'user',
+      senderId:  currentUser.id,
+      userName:  currentUser.name,
+      text,
+      createdAt: nowISO(),
+    });
+    if (c.status === 'pending') c.status = 'active';
+    saveComplaint(c);
+
+    textarea.value = '';
+    renderMessages(panelEl, c);
+    refreshCard(complaintId);
+  }
+
+  /* ── 重新整理單一卡片的狀態標籤（不重繪整個列表）── */
+  function refreshCard(complaintId) {
+    const c = getComplaintById(complaintId);
+    if (!c) return;
+    const badgeEl = document.querySelector(`[data-complaint-id="${complaintId}"] .status-badge`);
+    if (badgeEl) {
+      badgeEl.className = `status-badge status-${c.status}`;
+      badgeEl.textContent = statusLabel(c.status);
+    }
+  }
+
+  /* ── 開啟 / 收起對話面板 ── */
+  function toggleChatPanel(complaintId) {
+    const cardEl  = document.querySelector(`[data-complaint-id="${complaintId}"]`);
+    const panel   = cardEl.querySelector('.chat-panel');
+    const btn     = cardEl.querySelector('.btn-chat');
+    const isOpen  = openPanels.has(complaintId);
+
+    if (isOpen) {
+      panel.classList.remove('open');
+      btn.classList.remove('active');
+      btn.textContent = '💬 查看對話';
+      openPanels.delete(complaintId);
+      clearInterval(pollTimers[complaintId]);
+      delete pollTimers[complaintId];
+    } else {
+      panel.classList.add('open');
+      btn.classList.add('active');
+      btn.textContent = '▲ 收起對話';
+      openPanels.add(complaintId);
+
+      const c = getComplaintById(complaintId);
+      renderMessages(panel, c);
+
+      pollTimers[complaintId] = setInterval(() => {
+        const fresh = getComplaintById(complaintId);
+        renderMessages(panel, fresh);
+        refreshCard(complaintId);
+      }, 2000);
+    }
+  }
+
+  /* ── 建立單張客訴卡片 ── */
+  function buildCard(c) {
+    const isClosed  = c.status === 'closed';
+    const msgCount  = (c.messages || []).length;
+
+    const card = document.createElement('div');
+    card.className = 'complaint-card';
+    card.setAttribute('data-complaint-id', c.id);
+
+    card.innerHTML = `
+      <div class="complaint-card-body">
+        <div class="complaint-icon">📋</div>
+        <div class="complaint-info">
+          <div class="complaint-top-row">
+            <div class="complaint-title">${escapeHtml(c.title || c.type || '客訴')}</div>
+            <span class="status-badge status-${c.status}">${statusLabel(c.status)}</span>
+          </div>
+          <div class="complaint-meta">
+            提交時間：${formatDate(c.createdAt)}
+            ${c.orderId ? `&nbsp;·&nbsp;訂單：${escapeHtml(c.orderId)}` : ''}
+            &nbsp;·&nbsp;訊息數：${msgCount}
+          </div>
+          <div class="complaint-desc">${escapeHtml(c.description || '')}</div>
+        </div>
+      </div>
+      <div class="complaint-card-foot">
+        <span class="case-no-text">案件編號：${escapeHtml(c.caseNo || c.id)}</span>
+        <div class="card-actions">
+          <button class="btn-chat" onclick="toggleChatPanel('${c.id}')">💬 查看對話</button>
+        </div>
+      </div>
+      <div class="chat-panel">
+        <div class="chat-panel-inner">
+          <div class="chat-messages-list"></div>
+          ${isClosed
+            ? `<div class="chat-closed-tip">🔒 案件已結案，無法繼續發送訊息</div>`
+            : `<div class="chat-input-row">
+                <textarea class="chat-textarea" placeholder="輸入訊息… (Enter 送出，Shift+Enter 換行)" rows="2"></textarea>
+                <button class="btn-send" onclick="sendComplaintMsg('${c.id}', this.closest('.chat-panel'))">送出</button>
+               </div>`
+          }
+        </div>
+      </div>`;
+
+    /* Enter 送出 */
+    const textarea = card.querySelector('.chat-textarea');
+    if (textarea) {
+      textarea.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendComplaintMsg(c.id, card.querySelector('.chat-panel'));
+        }
+      });
+    }
+
+    return card;
+  }
+
+  /* ── 主渲染 ── */
+  function render() {
+    const root = document.getElementById('complaint-list-root');
+    root.innerHTML = '';
+
+    const complaints = getComplaints()
+      .filter(c => c.userId === currentUser.id)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    if (complaints.length === 0) {
+      root.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📭</div>
+          <p>目前沒有客訴記錄</p>
+          <a class="btn-primary" href="train-complaint.html">提交客訴</a>
+        </div>`;
+      return;
+    }
+
+    complaints.forEach(c => root.appendChild(buildCard(c)));
+  }
+
+  /* ── 監聽跨分頁更新 ── */
+  window.addEventListener('storage', e => {
+    if (e.key === 'agenttt_complaints') {
+      openPanels.forEach(id => {
+        const cardEl = document.querySelector(`[data-complaint-id="${id}"]`);
+        if (cardEl) {
+          const fresh = getComplaintById(id);
+          renderMessages(cardEl.querySelector('.chat-panel'), fresh);
+          refreshCard(id);
+        }
+      });
+    }
+  });
+
+  render();
+</script>
+</body>
+</html>

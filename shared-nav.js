@@ -128,6 +128,7 @@ function _dropdownMenuByRole(role) {
       _dropdownItem('train-tickets.html',            '🎫 我的票券'),
       _dropdownItem('train-points.html',             '⭐ 點數中心'),
       _dropdownItem('train-complaint.html',          '💬 客訴服務'),
+      _dropdownItem('train-complaint-list.html',     '📋 我的客訴'),
       '<div class="dropdown-divider"></div>',
       _logoutItem(),
     ].join('');

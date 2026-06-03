@@ -740,6 +740,15 @@
         allComplaints[allIdx].closedAt = nowISO();
       }
       setData('agenttt_complaints', allComplaints);
+      if (typeof addNotification === 'function') {
+        addNotification(
+          allComplaints[allIdx].userId,
+          'complaint_reply',
+          '客訴有新回覆',
+          `案件 ${allComplaints[allIdx].caseNo}：${text.substring(0, 30)}...`,
+          'train-complaint-list.html'
+        );
+      }
     }
     renderCsList();
     renderCsMain();

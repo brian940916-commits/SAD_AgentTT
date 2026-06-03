@@ -349,8 +349,9 @@
               案件編號
               <strong id="case-no-display">—</strong>
             </div>
-            <div style="display:flex;gap:10px;justify-content:center;">
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
               <button onclick="showTab('track', document.querySelectorAll('.main-tab')[2])" style="padding:9px 20px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:600;font-family:var(--font-main);cursor:pointer;">查看案件進度</button>
+              <button onclick="location.href='train-complaint-list.html'" style="padding:9px 20px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:600;font-family:var(--font-main);cursor:pointer;">查看我的客訴</button>
               <button onclick="resetForm()" style="padding:9px 20px;background:#fff;border:1px solid #B8DDCA;color:var(--color-success-text);border-radius:var(--radius-md);font-size:13px;font-weight:600;font-family:var(--font-main);cursor:pointer;">再次提交</button>
             </div>
           </div>
