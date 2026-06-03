@@ -467,13 +467,21 @@
       props[idx].status      = 'offline';
       props[idx].rejectReason = reason;
       setData('agenttt_properties', props);
-      addNotification(
-        props[idx].hostId,
-        'property_rejected',
-        '房源審核未通過',
-        `「${props[idx].name}」審核未通過：${reason}`,
-        'host-dashboard.html'
-      );
+      try {
+        if (typeof addNotification === 'function') {
+          addNotification(
+            props[idx].hostId,
+            'property_rejected',
+            '房源審核未通過',
+            `「${props[idx].name}」審核未通過：${reason}`,
+            'host-dashboard.html'
+          );
+        } else {
+          console.warn('[admin] addNotification 不存在，請強制重新整理頁面（Ctrl+Shift+R）');
+        }
+      } catch (err) {
+        console.error('[admin] 寫入退件通知失敗：', err);
+      }
     }
     closeRejectModal();
     updateBadges();
