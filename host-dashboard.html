@@ -901,8 +901,9 @@
     const hostInitial  = (currentUser.name || 'H').slice(0, 1);
     const guestInitial = (conv.guestName || 'G').slice(0, 1);
 
+    // 用 senderRole 對比角色（host-dashboard 必為 host 視角）
     const msgsHtml = conv.messages.map(m => {
-      const isMine = m.senderId === currentUser.id;
+      const isMine = m.senderRole === 'host';
       return `
         <div class="chat-msg ${isMine ? 'mine' : ''}">
           <div class="chat-avatar">${isMine ? escHtml(hostInitial) : escHtml(guestInitial)}</div>

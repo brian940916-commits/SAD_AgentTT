@@ -162,13 +162,14 @@
       subEl.textContent   = host ? `房東：${host.name}` : '';
     }
 
-    // 訊息列表
+    // 訊息列表（用 senderRole 對比 user.role，避免共用 localStorage 時 senderId 失準）
+    const myRole = user.role === 'host' ? 'host' : 'guest';
     const bodyEl = document.getElementById('att-chat-body');
     if (!conv.messages.length) {
       bodyEl.innerHTML = `<div class="att-chat-empty">尚無訊息，傳送第一則訊息開啟對話 👋</div>`;
     } else {
       bodyEl.innerHTML = conv.messages.map(m => {
-        const mine = m.senderId === user.id;
+        const mine = m.senderRole === myRole;
         return `
           <div class="att-msg-row ${mine ? 'mine' : 'theirs'}">
             <div class="att-msg-bubble">${_esc(m.text)}</div>
