@@ -333,6 +333,7 @@
   let csFilter      = 'all';
   let activeCaseIdx = 0;
   let allComplaints = [];
+  let _csLastSig    = '';   // 客訴資料快照，用於偵測外部變更
 
   /* ════════════════════════════════
      初始化
@@ -340,6 +341,7 @@
   function init() {
     document.getElementById('admin-name').textContent = currentUser.name;
     allComplaints = getComplaints();
+    _csLastSig    = JSON.stringify(allComplaints);
 
     updateBadges();
     renderPendingProps();
@@ -347,6 +349,43 @@
     renderAllReviews();
     renderCsList();
     renderCsMain();
+
+    // 即時更新客訴：顧客在另一分頁送來的訊息會自動出現
+    window.addEventListener('storage', e => {
+      if (e.key === 'agenttt_complaints') refreshComplaintsLive();
+    });
+    setInterval(refreshComplaintsLive, 2000);
+  }
+
+  /* 偵測客訴資料變更並即時重繪（不打斷管理員正在輸入的內容、保留選中案件） */
+  function refreshComplaintsLive() {
+    const fresh = getComplaints();
+    const sig   = JSON.stringify(fresh);
+    if (sig === _csLastSig) return;   // 無變更則跳過，避免干擾輸入/捲動
+    _csLastSig = sig;
+
+    const inp     = document.getElementById('cs-input-field');
+    const draft   = inp ? inp.value : '';
+    const focused = inp && document.activeElement === inp;
+
+    const prevList = filteredComplaints();
+    const activeId = prevList[activeCaseIdx] ? prevList[activeCaseIdx].id : null;
+
+    allComplaints = fresh;
+
+    // 重新定位先前選中的案件（其 index 可能因排序/狀態改變而位移）
+    if (activeId) {
+      const newIdx = filteredComplaints().findIndex(c => c.id === activeId);
+      if (newIdx >= 0) activeCaseIdx = newIdx;
+    }
+
+    renderCsList();
+    renderCsMain();
+    updateBadges();
+
+    // 還原管理員未送出的草稿
+    const inp2 = document.getElementById('cs-input-field');
+    if (inp2 && draft) { inp2.value = draft; if (focused) inp2.focus(); }
   }
 
   function updateBadges() {
@@ -740,14 +779,25 @@
         allComplaints[allIdx].closedAt = nowISO();
       }
       setData('agenttt_complaints', allComplaints);
+      _csLastSig = JSON.stringify(allComplaints);
       if (typeof addNotification === 'function') {
-        addNotification(
-          allComplaints[allIdx].userId,
-          'complaint_reply',
-          '客訴有新回覆',
-          `案件 ${allComplaints[allIdx].caseNo}：${text.substring(0, 30)}...`,
-          'train-complaint-list.html'
-        );
+        if (closeAfter) {
+          addNotification(
+            allComplaints[allIdx].userId,
+            'complaint_reply',
+            '客訴已結案',
+            `案件 ${allComplaints[allIdx].caseNo} 已由客服結案`,
+            'train-complaint-list.html'
+          );
+        } else {
+          addNotification(
+            allComplaints[allIdx].userId,
+            'complaint_reply',
+            '客訴有新回覆',
+            `案件 ${allComplaints[allIdx].caseNo}：${text.substring(0, 30)}...`,
+            'train-complaint-list.html'
+          );
+        }
       }
     }
     renderCsList();
