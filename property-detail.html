@@ -733,8 +733,9 @@
   };
 
   function initChat() {
-    // 預設一則歡迎訊息
+    // 預設兩則：說明 + 歡迎
     chatMsgs = [
+      { sender:'host', text:'💡 此為房源預諮詢（AI 模擬）。完成訂房後，可在「我的訂單」中與房東進行正式對話。', time: nowISO() },
       { sender:'host', text:`您好！歡迎詢問「${propData.name}」，請問有什麼需要協助的嗎？😊`, time: nowISO() }
     ];
     renderChatMessages();

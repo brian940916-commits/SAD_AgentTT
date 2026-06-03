@@ -439,11 +439,6 @@
   }
   function fmt(d) { return d ? d.toISOString().slice(0,10) : ''; }
 
-  /* ── 訊息 localStorage ── */
-  const MSG_KEY = 'agenttt_messages';
-  function getConvs()    { try { return JSON.parse(localStorage.getItem(MSG_KEY) || '[]'); } catch { return []; } }
-  function setConvs(c)   { localStorage.setItem(MSG_KEY, JSON.stringify(c)); }
-
   /* ── 定價 localStorage ── */
   const PRICE_KEY = 'agenttt_pricing';
   function getPricing()  { try { return JSON.parse(localStorage.getItem(PRICE_KEY) || '{}'); } catch { return {}; } }
@@ -500,6 +495,18 @@
     document.querySelectorAll('.sidebar-menu-item').forEach(el => el.classList.remove('active'));
     document.getElementById('sec-' + name).classList.add('active');
     document.querySelector(`[data-section="${name}"]`).classList.add('active');
+
+    // 顧客訊息：進入啟動輪詢，離開停止
+    if (name === 'messages') {
+      initConversations();
+      renderConvList();
+      renderChatMain();
+      if (activeBookingId) markConversationRead(activeBookingId, currentUser.id);
+      startChatPoll();
+      window.dispatchEvent(new Event('agenttt:unread-changed'));
+    } else {
+      if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+    }
   }
 
   function toggleAddPanel(propId) {
@@ -760,7 +767,8 @@
             <span class="badge ${statusMap[b.status] || ''}">${statusLbl[b.status] || b.status}</span>
             <div class="order-row-price">NT$ ${(b.totalPrice || 0).toLocaleString()}</div>
             ${(b.status === 'paid' || b.status === 'pending') ? `<button class="btn btn-primary btn-sm" onclick="markOrderCompleted('${escHtml(b.id)}')">✅ 標記為完成</button>` : ''}
-            <button class="btn btn-outline btn-sm" onclick="openOrderDetail('${escHtml(b.id)}')">查看詳情</button>
+            <button class="btn btn-outline btn-sm" onclick="window.openChatModal('${escHtml(b.id)}')">💬 聯絡旅客</button>
+            <button class="btn btn-outline btn-sm" onclick="openOrderDetail('${escHtml(b.id)}')">📋 訂單詳情</button>
           </div>
         </div>`).join('');
   }
@@ -820,29 +828,21 @@
     { label:'行李寄放', text:'當然可以！入住前及退房後均提供免費行李寄放，請於前台登記即可🧳' },
   ];
 
+  let activeBookingId = null;
+  let chatPollTimer   = null;
+
   function initConversations() {
-    let convs = getConvs();
-    // 若無對話，從訂房記錄建立假對話
-    if (convs.length === 0 && hostBookings.length > 0) {
-      hostBookings.slice(0, 3).forEach((b, i) => {
-        convs.push({
-          id:           'conv_' + b.id,
-          hostId:       currentUser.id,
-          guestId:      b.userId || 'u_guest_01',
-          guestName:    b.guestName || '旅客',
-          propertyId:   b.propertyId,
-          propertyName: b.propertyName,
-          messages: [
-            { sender:'guest', text:`您好！我是 ${b.guestName || '旅客'}，預計 ${b.checkIn} 入住，請問有什麼需要注意的嗎？`, createdAt: b.createdAt },
-          ],
-        });
-      });
-      setConvs(convs);
+    convData = getConversationsByHost(currentUser.id);
+    if (convData.length > 0 && !activeBookingId) {
+      activeBookingId = convData[0].bookingId;
     }
-    convData = getConvs().filter(c => c.hostId === currentUser.id);
+    activeConvIdx = convData.findIndex(c => c.bookingId === activeBookingId);
+    if (activeConvIdx < 0) activeConvIdx = 0;
   }
 
   function renderConvList() {
+    convData = getConversationsByHost(currentUser.id);
+    activeConvIdx = convData.findIndex(c => c.bookingId === activeBookingId);
     const el = document.getElementById('conv-list');
     if (!convData.length) {
       el.innerHTML = `<div style="padding:var(--space-md);font-size:13px;color:var(--color-text-light);">目前無訊息</div>`;
@@ -850,33 +850,59 @@
     }
     el.innerHTML = convData.map((c, i) => {
       const last = c.messages[c.messages.length - 1];
+      const unread = c.messages.filter(m =>
+        m.senderId !== currentUser.id && !(m.readBy || []).includes(currentUser.id)
+      ).length;
+      const preview = last ? escHtml(last.text.slice(0, 24) + (last.text.length > 24 ? '…' : '')) : '尚無訊息';
+      const isActive = c.bookingId === activeBookingId;
       return `
-        <div class="conv-item ${i === activeConvIdx ? 'active' : ''}" onclick="selectConv(${i})">
-          <div class="conv-name">${escHtml(c.guestName)}</div>
+        <div class="conv-item ${isActive ? 'active' : ''}" onclick="selectConv(${i})">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div class="conv-name">${escHtml(c.guestName)}</div>
+            ${unread > 0 ? `<span style="background:#C4514A;color:#fff;font-size:10px;font-weight:700;border-radius:8px;padding:1px 6px;min-width:18px;text-align:center;">${unread > 9 ? '9+' : unread}</span>` : ''}
+          </div>
           <div class="conv-prop">📍 ${escHtml(c.propertyName)}</div>
-          <div class="conv-last">${escHtml(last?.text || '')}</div>
+          <div class="conv-last">${preview}</div>
         </div>`;
     }).join('');
   }
 
   function selectConv(idx) {
-    activeConvIdx = idx;
+    activeConvIdx   = idx;
+    activeBookingId = convData[idx].bookingId;
+    markConversationRead(activeBookingId, currentUser.id);
+    window.dispatchEvent(new Event('agenttt:unread-changed'));
     renderConvList();
     renderChatMain();
+    startChatPoll();
+  }
+
+  function startChatPoll() {
+    if (chatPollTimer) clearInterval(chatPollTimer);
+    chatPollTimer = setInterval(() => {
+      if (!activeBookingId) return;
+      renderChatMain();
+      markConversationRead(activeBookingId, currentUser.id);
+      renderConvList();
+    }, 2000);
   }
 
   function renderChatMain() {
     const el = document.getElementById('chat-main');
-    if (!convData.length) {
+    if (!convData.length || !activeBookingId) {
       el.innerHTML = `<div class="empty-msg" style="margin:auto;">選擇對話以查看訊息</div>`;
       return;
     }
-    const conv = convData[activeConvIdx];
-    const hostInitial = (currentUser.name || 'H').slice(0, 1);
+    const conv = getConversationByBookingId(activeBookingId);
+    if (!conv) {
+      el.innerHTML = `<div class="empty-msg" style="margin:auto;">對話不存在</div>`;
+      return;
+    }
+    const hostInitial  = (currentUser.name || 'H').slice(0, 1);
     const guestInitial = (conv.guestName || 'G').slice(0, 1);
 
     const msgsHtml = conv.messages.map(m => {
-      const isMine = m.sender === 'host';
+      const isMine = m.senderId === currentUser.id;
       return `
         <div class="chat-msg ${isMine ? 'mine' : ''}">
           <div class="chat-avatar">${isMine ? escHtml(hostInitial) : escHtml(guestInitial)}</div>
@@ -888,7 +914,8 @@
       `<button class="canned-chip" onclick="sendCanned(${JSON.stringify(r.text)})">${escHtml(r.label)}</button>`
     ).join('');
 
-    el.innerHTML = `
+    // 只在內容真的改變時才整段重繪，避免輪詢打斷使用者輸入
+    const newHtml = `
       <div class="chat-head">
         <div class="chat-head-name">👤 ${escHtml(conv.guestName)}</div>
         <div class="chat-head-prop">📍 ${escHtml(conv.propertyName)}</div>
@@ -900,7 +927,23 @@
         <button class="chat-send" onclick="sendHostMsg()" aria-label="送出">➤</button>
       </div>`;
 
-    scrollMsgs();
+    // 保留輸入框內容（僅在同一對話內，新訊息進來時不打斷輸入）
+    const oldInput      = document.getElementById('chat-input-field');
+    const oldValue      = oldInput ? oldInput.value : '';
+    const oldFocus      = document.activeElement === oldInput;
+    const sameBooking   = el.dataset.bookingId === activeBookingId;
+
+    if (!sameBooking || el.dataset.msgCount !== String(conv.messages.length)) {
+      el.dataset.bookingId = activeBookingId;
+      el.dataset.msgCount  = String(conv.messages.length);
+      el.innerHTML = newHtml;
+      const newInput = document.getElementById('chat-input-field');
+      if (newInput && sameBooking) {
+        newInput.value = oldValue;
+        if (oldFocus) newInput.focus();
+      }
+      scrollMsgs();
+    }
   }
 
   function scrollMsgs() {
@@ -909,12 +952,19 @@
   }
 
   function sendHostMsg() {
+    if (!activeBookingId) return;
     const input = document.getElementById('chat-input-field');
     if (!input) return;
     const text = input.value.trim();
     if (!text) return;
-    pushMsg(text);
+    sendMessage(activeBookingId, 'host', text);
     input.value = '';
+    // 強制重繪
+    const el = document.getElementById('chat-main');
+    if (el) el.dataset.msgCount = '';
+    renderChatMain();
+    renderConvList();
+    window.dispatchEvent(new Event('agenttt:unread-changed'));
   }
 
   function sendCanned(text) {
@@ -922,22 +972,17 @@
     if (input) { input.value = text; input.focus(); }
   }
 
-  function pushMsg(text) {
-    const convs = getConvs();
-    const conv  = convData[activeConvIdx];
-    const idx   = convs.findIndex(c => c.id === conv.id);
-    if (idx < 0) return;
-    const msg = { sender: 'host', text, createdAt: nowISO() };
-    convs[idx].messages.push(msg);
-    setConvs(convs);
-    convData[activeConvIdx].messages.push(msg);
-    renderChatMain();
-    renderConvList();
-  }
-
   function onChatKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendHostMsg(); }
   }
+
+  // storage 事件同步（多分頁/視窗）
+  window.addEventListener('storage', e => {
+    if (e.key === 'agenttt_messages') {
+      renderConvList();
+      renderChatMain();
+    }
+  });
 
   init();
 </script>
