@@ -18,6 +18,7 @@ const KEYS = {
   FAVORITES:      'agenttt_favorites',
   MESSAGES:       'agenttt_messages',
   REVIEWS:        'agenttt_reviews',
+  NOTIFICATIONS:  'agenttt_notifications',
 };
 
 const MESSAGES_SCHEMA_VERSION = '2';
@@ -120,6 +121,10 @@ function migrateMessagesIfNeeded() {
    Message (v2 訂單對話用): {
      id, senderId, senderRole: 'guest'|'host',
      text, createdAt, readBy: string[]
+   }
+
+   Notification: {
+     id, userId, type, title, content, link, read, createdAt
    }
 
    Vote: { id: string, tripId: string, title: string,
@@ -383,6 +388,37 @@ function getConversationsByGuest(guestId) {
   return getConversations()
     .filter(c => c.guestId === guestId)
     .sort((a, b) => (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''));
+}
+
+/* ── 通知 ────────────────────────────────────────────────── */
+
+function getNotifications() {
+  return getData(KEYS.NOTIFICATIONS) || [];
+}
+
+function getNotificationsByUser(userId) {
+  return getNotifications()
+    .filter(n => n.userId === userId)
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+function addNotification(userId, type, title, content, link) {
+  const list = getNotifications();
+  list.push({
+    id: generateId(), userId, type, title, content, link,
+    read: false, createdAt: nowISO()
+  });
+  setData(KEYS.NOTIFICATIONS, list);
+}
+
+function markNotificationRead(id) {
+  const list = getNotifications();
+  const idx = list.findIndex(n => n.id === id);
+  if (idx >= 0) { list[idx].read = true; setData(KEYS.NOTIFICATIONS, list); }
+}
+
+function getUnreadNotificationCount(userId) {
+  return getNotifications().filter(n => n.userId === userId && !n.read).length;
 }
 
 /* ── 點數 ────────────────────────────────────────────────── */

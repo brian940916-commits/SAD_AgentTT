@@ -467,6 +467,13 @@
       props[idx].status      = 'offline';
       props[idx].rejectReason = reason;
       setData('agenttt_properties', props);
+      addNotification(
+        props[idx].hostId,
+        'property_rejected',
+        '房源審核未通過',
+        `「${props[idx].name}」審核未通過：${reason}`,
+        'host-dashboard.html'
+      );
     }
     closeRejectModal();
     updateBadges();

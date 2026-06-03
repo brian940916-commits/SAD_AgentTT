@@ -149,6 +149,25 @@ function _dropdownMenuByRole(role) {
   return _logoutItem();
 }
 
+/* ── 通知中心（admin 不顯示）──────────────────────────────── */
+function _notifCenter(user) {
+  if (!user || user.role === 'admin') return '';
+  return `
+    <div class="nav-msg-wrap">
+      <button class="nav-msg-btn" id="nav-notif-btn" aria-haspopup="true"
+              aria-expanded="false" aria-label="通知中心" title="通知中心">
+        🔔
+        <span class="nav-msg-badge hidden" id="nav-notif-badge">0</span>
+      </button>
+      <div class="nav-msg-dropdown hidden" id="nav-notif-dropdown" role="menu">
+        <div class="nav-msg-head">🔔 通知中心</div>
+        <div class="nav-msg-list" id="nav-notif-list">
+          <div class="nav-msg-empty">目前沒有通知</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 /* ── 訊息中心（admin 不顯示）──────────────────────────────── */
 function _messageCenter(user) {
   if (!user || user.role === 'admin') return '';
@@ -175,6 +194,7 @@ function _rightSection(user) {
   }
 
   return `
+    ${_notifCenter(user)}
     ${_messageCenter(user)}
     <span style="font-size:13px;color:#C5B886;">${user.name}</span>
     <div class="dropdown">
@@ -276,6 +296,14 @@ function _bindNavEvents() {
   const dropdown  = document.getElementById('nav-dropdown');
   const msgBtn    = document.getElementById('nav-msg-btn');
   const msgDrop   = document.getElementById('nav-msg-dropdown');
+  const notifBtn  = document.getElementById('nav-notif-btn');
+  const notifDrop = document.getElementById('nav-notif-dropdown');
+
+  const _closeAllDropsExcept = (keep) => {
+    if (keep !== 'avatar' && dropdown)  { dropdown.classList.add('hidden');  if (avatar)   avatar.setAttribute('aria-expanded', 'false'); }
+    if (keep !== 'msg'    && msgDrop)   { msgDrop.classList.add('hidden');   if (msgBtn)   msgBtn.setAttribute('aria-expanded', 'false'); }
+    if (keep !== 'notif'  && notifDrop) { notifDrop.classList.add('hidden'); if (notifBtn) notifBtn.setAttribute('aria-expanded', 'false'); }
+  };
 
   if (avatar && dropdown) {
     avatar.addEventListener('click', (e) => {
@@ -283,8 +311,7 @@ function _bindNavEvents() {
       const isOpen = !dropdown.classList.contains('hidden');
       dropdown.classList.toggle('hidden', isOpen);
       avatar.setAttribute('aria-expanded', String(!isOpen));
-      if (msgDrop) msgDrop.classList.add('hidden');
-      if (msgBtn)  msgBtn.setAttribute('aria-expanded', 'false');
+      _closeAllDropsExcept('avatar');
     });
 
     avatar.addEventListener('keydown', (e) => {
@@ -303,10 +330,22 @@ function _bindNavEvents() {
       if (!isOpen) _renderMsgList();
       msgDrop.classList.toggle('hidden', isOpen);
       msgBtn.setAttribute('aria-expanded', String(!isOpen));
-      if (dropdown) dropdown.classList.add('hidden');
-      if (avatar)   avatar.setAttribute('aria-expanded', 'false');
+      _closeAllDropsExcept('msg');
     });
     msgDrop.addEventListener('click', (e) => e.stopPropagation());
+  }
+
+  /* 通知中心切換 */
+  if (notifBtn && notifDrop) {
+    notifBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = !notifDrop.classList.contains('hidden');
+      if (!isOpen) _renderNotifList();
+      notifDrop.classList.toggle('hidden', isOpen);
+      notifBtn.setAttribute('aria-expanded', String(!isOpen));
+      _closeAllDropsExcept('notif');
+    });
+    notifDrop.addEventListener('click', (e) => e.stopPropagation());
   }
 
   /* 登出按鈕 */
@@ -339,14 +378,7 @@ function _bindNavEvents() {
 
   /* 點擊外部關閉下拉與漢堡選單 */
   document.addEventListener('click', () => {
-    if (dropdown) {
-      dropdown.classList.add('hidden');
-      if (avatar) avatar.setAttribute('aria-expanded', 'false');
-    }
-    if (msgDrop) {
-      msgDrop.classList.add('hidden');
-      if (msgBtn) msgBtn.setAttribute('aria-expanded', 'false');
-    }
+    _closeAllDropsExcept(null);
     if (navLinks && hamburger) {
       navLinks.classList.remove('mobile-open');
       hamburger.textContent = '☰';
@@ -355,7 +387,8 @@ function _bindNavEvents() {
   }, { capture: false });
 
   /* 未讀紅點：初始化 + 監聽 storage / 自訂事件 / 5 秒輪詢 */
-  if (msgBtn) _initUnreadBadge();
+  if (msgBtn)   _initUnreadBadge();
+  if (notifBtn) _initNotifBadge();
 }
 
 /* ── 訊息中心未讀紅點與下拉列表 ─────────────────────────── */
@@ -460,6 +493,89 @@ function _renderMsgList() {
       if (typeof window.openChatModal === 'function') {
         window.openChatModal(bid);
       }
+    });
+  });
+}
+
+/* ── 通知中心 ─────────────────────────────────────────────── */
+let _notifPollTimer = null;
+
+function _refreshNotifBadge() {
+  const badge = document.getElementById('nav-notif-badge');
+  if (!badge) return;
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  if (!user || user.role === 'admin') return;
+  const n = typeof getUnreadNotificationCount === 'function'
+    ? getUnreadNotificationCount(user.id)
+    : 0;
+  if (n > 0) {
+    badge.textContent = n > 9 ? '9+' : String(n);
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function _initNotifBadge() {
+  _refreshNotifBadge();
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'agenttt_notifications') {
+      _refreshNotifBadge();
+      const dropdown = document.getElementById('nav-notif-dropdown');
+      if (dropdown && !dropdown.classList.contains('hidden')) _renderNotifList();
+    }
+  });
+  window.addEventListener('agenttt:notif-changed', () => {
+    _refreshNotifBadge();
+    const dropdown = document.getElementById('nav-notif-dropdown');
+    if (dropdown && !dropdown.classList.contains('hidden')) _renderNotifList();
+  });
+  if (_notifPollTimer) clearInterval(_notifPollTimer);
+  _notifPollTimer = setInterval(_refreshNotifBadge, 5000);
+}
+
+function _renderNotifList() {
+  const listEl = document.getElementById('nav-notif-list');
+  if (!listEl) return;
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  if (!user) return;
+
+  const notifs = typeof getNotificationsByUser === 'function'
+    ? getNotificationsByUser(user.id)
+    : [];
+
+  if (!notifs.length) {
+    listEl.innerHTML = `<div class="nav-msg-empty">目前沒有通知</div>`;
+    return;
+  }
+
+  listEl.innerHTML = notifs.slice(0, 5).map(n => {
+    const time = _fmtMsgTime(n.createdAt);
+    return `
+      <div class="nav-msg-item" data-notif-id="${_escNav(n.id)}" data-link="${_escNav(n.link || '')}"
+           style="${n.read ? 'opacity:.6;' : ''}">
+        <div class="nav-msg-item-body">
+          <div class="nav-msg-item-title">${_escNav(n.title)}</div>
+          <div class="nav-msg-item-preview">${_escNav(n.content)}</div>
+        </div>
+        <div class="nav-msg-item-meta">
+          <div class="nav-msg-item-time">${time}</div>
+          ${!n.read ? `<div class="nav-msg-item-unread">●</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.nav-msg-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id   = el.getAttribute('data-notif-id');
+      const link = el.getAttribute('data-link');
+      markNotificationRead(id);
+      _refreshNotifBadge();
+      const dropdown = document.getElementById('nav-notif-dropdown');
+      const btn      = document.getElementById('nav-notif-btn');
+      if (dropdown) dropdown.classList.add('hidden');
+      if (btn)      btn.setAttribute('aria-expanded', 'false');
+      if (link) window.location.href = link;
     });
   });
 }

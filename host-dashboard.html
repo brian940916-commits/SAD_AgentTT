@@ -225,6 +225,9 @@
     <div class="main-content">
       <div class="main-inner">
 
+        <!-- 退件通知 banner（不限於房源分頁）-->
+        <div id="reject-banner-container" style="display:none;margin-bottom:var(--space-md);"></div>
+
         <!-- §1 我的房源 -->
         <div class="section-page active" id="sec-properties">
           <div class="page-title-row">
@@ -468,6 +471,9 @@
   function init() {
     document.getElementById('host-name-sub').textContent = currentUser.name;
 
+    // 退件通知 banner
+    renderRejectBanner();
+
     // 讀取房源
     hostProps = getProperties().filter(p => p.hostId === currentUser.id);
 
@@ -475,7 +481,7 @@
     const propIds = new Set(hostProps.map(p => p.id));
     hostBookings  = getBookings().filter(b => propIds.has(b.propertyId));
 
-    // 初始化對話（從訂房建立假對話）
+    // 初始化對話
     initConversations();
 
     activePropId = hostProps[0]?.id || '';
@@ -485,6 +491,36 @@
     renderHostOrders();
     renderConvList();
     renderChatMain();
+  }
+
+  function renderRejectBanner() {
+    const container = document.getElementById('reject-banner-container');
+    if (!container) return;
+    const items = getNotificationsByUser(currentUser.id)
+      .filter(n => !n.read && n.type === 'property_rejected');
+    if (!items.length) { container.innerHTML = ''; container.style.display = 'none'; return; }
+    container.style.display = 'block';
+    container.innerHTML = items.map(n => {
+      const t = new Date(n.createdAt);
+      const timeStr = `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+      return `
+        <div style="background:#FCEBEB;border:1px solid #C4514A;border-radius:8px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;">
+          <div style="font-size:18px;flex-shrink:0;">⚠️</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:700;color:#7a2a26;margin-bottom:3px;">${escHtml(n.title)}</div>
+            <div style="font-size:13px;color:#7a2a26;line-height:1.5;">${escHtml(n.content)}</div>
+            <div style="font-size:11px;color:#a06b67;margin-top:4px;">${timeStr}</div>
+          </div>
+          <button class="btn btn-sm" style="background:#fff;border:1.5px solid #C4514A;color:#C4514A;font-weight:600;flex-shrink:0;"
+                  onclick="dismissRejectNotice('${escHtml(n.id)}')">我知道了</button>
+        </div>`;
+    }).join('');
+  }
+
+  function dismissRejectNotice(id) {
+    markNotificationRead(id);
+    renderRejectBanner();
+    window.dispatchEvent(new Event('agenttt:notif-changed'));
   }
 
   /* ════════════════════════════════
