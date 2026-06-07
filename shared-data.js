@@ -287,6 +287,71 @@ function saveBooking(booking) {
   setData(KEYS.BOOKINGS, bookings);
 }
 
+/* ── 房源可訂日檢查 ───────────────────────────────────────── */
+/* 列出 [checkIn, checkOut) 期間每一晚的日期字串（本地時區，避免 off-by-one） */
+function eachNight(checkIn, checkOut) {
+  const out = [];
+  if (!checkIn || !checkOut) return out;
+  let d = new Date(checkIn + 'T00:00:00');
+  const end = new Date(checkOut + 'T00:00:00');
+  while (d < end) {
+    out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+/* 國定假日（採國定假日房價 priceHoliday）；週六/週日採假日房價 priceWeekend */
+const TW_HOLIDAYS = new Set([
+  '2026-01-01',                                                         // 元旦
+  '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',     // 春節
+  '2026-02-28',                                                         // 和平紀念日
+  '2026-04-03','2026-04-04','2026-04-05','2026-04-06',                  // 兒童節/清明連假
+  '2026-05-01',                                                         // 勞動節
+  '2026-06-19',                                                         // 端午節
+  '2026-09-25',                                                         // 中秋節
+  '2026-10-10',                                                         // 國慶日
+]);
+
+/* 依日期回傳當晚房價：國定假日 > 週末 > 平日 */
+function getNightlyRate(prop, dateStr) {
+  if (!prop) return 0;
+  if (TW_HOLIDAYS.has(dateStr)) return prop.priceHoliday || prop.priceWeekend || prop.priceWeekday || 0;
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  if (dow === 0 || dow === 6) return prop.priceWeekend || prop.priceWeekday || 0;
+  return prop.priceWeekday || 0;
+}
+
+/* 加總入住期間每一晚的房價（平日/週末/假日分別計價） */
+function calcRoomTotal(prop, checkIn, checkOut) {
+  return eachNight(checkIn, checkOut).reduce((sum, d) => sum + getNightlyRate(prop, d), 0);
+}
+
+/* 檢查房源在指定入住期間是否可預訂（房東未關閉該日、且無既有訂單衝突）
+   回傳 { ok: boolean, reason: string } */
+function checkAvailability(propertyId, checkIn, checkOut, ignoreBookingId) {
+  const nights = eachNight(checkIn, checkOut);
+  if (!nights.length) return { ok: false, reason: '請選擇有效的入住與退房日期' };
+
+  // 1) 房東於月曆上關閉的日期（agenttt_pricing[propId][date] === 'closed'）
+  let pricing = {};
+  try { pricing = JSON.parse(localStorage.getItem('agenttt_pricing') || '{}'); } catch (e) {}
+  const propPricing = pricing[propertyId] || {};
+  const closed = nights.find(d => propPricing[d] === 'closed');
+  if (closed) return { ok: false, reason: `房東已關閉 ${closed} 的預訂，請改選其他日期` };
+
+  // 2) 與既有訂單（未取消）日期衝突
+  const bookings = getBookings().filter(b =>
+    b.propertyId === propertyId && b.status !== 'cancelled' && b.id !== ignoreBookingId
+  );
+  for (const b of bookings) {
+    const occupied = new Set(eachNight(b.checkIn, b.checkOut));
+    const clash = nights.find(d => occupied.has(d));
+    if (clash) return { ok: false, reason: `${clash} 已有訂單，該日期不可重複預訂` };
+  }
+  return { ok: true, reason: '' };
+}
+
 function linkBookingToTrip(bookingId, tripId) {
   const booking = getBookingById(bookingId);
   if (!booking) return;

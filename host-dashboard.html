@@ -440,7 +440,8 @@
     el.textContent = msg; el.classList.add('show');
     setTimeout(() => el.classList.remove('show'), ms);
   }
-  function fmt(d) { return d ? d.toISOString().slice(0,10) : ''; }
+  // 用本地時區格式化日期，避免 toISOString() 在 UTC+8 把日期退一天（日曆標記前一天）
+  function fmt(d) { return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : ''; }
 
   /* ── 定價 localStorage ── */
   const PRICE_KEY = 'agenttt_pricing';
@@ -658,7 +659,7 @@
             ${isPending  ? `<div style="font-size:12px;color:var(--color-warning-text);margin-top:4px;">⏳ 等待管理員審核，審核通過後自動上線</div>` : ''}
             ${isRejected ? `<div style="font-size:12px;color:var(--color-danger-text);background:var(--color-danger);border-radius:6px;padding:6px 10px;margin-top:6px;">❌ 退件原因：${escHtml(p.rejectReason)}</div>` : ''}
             <div class="prop-host-actions">
-              ${!isPending ? `<button class="btn btn-outline btn-sm" onclick="toggleAddPanel('${escHtml(p.id)}')">✏️ 編輯</button>` : ''}
+              ${!isPending && !isRejected ? `<button class="btn btn-outline btn-sm" onclick="toggleAddPanel('${escHtml(p.id)}')">✏️ 編輯</button>` : ''}
               ${p.status === 'online'   ? `<button class="btn btn-ghost btn-sm" onclick="setPropStatus('${escHtml(p.id)}','offline')">下架</button>` : ''}
               ${p.status === 'offline' && !isRejected ? `<button class="btn btn-primary btn-sm" onclick="setPropStatus('${escHtml(p.id)}','online')">重新上架</button>` : ''}
               ${isRejected ? `<button class="btn btn-primary btn-sm" onclick="resubmitProp('${escHtml(p.id)}')">修改並重新送審</button>` : ''}

@@ -537,14 +537,27 @@
 
   /* ── 評價列表 ── */
   function renderReviews() {
-    const reviews = getReviews(propId);
+    // 排除管理員已隱藏的評價（前台不顯示）
+    const reviews = getReviews(propId).filter(r => !r.hidden);
 
     if (!reviews.length) {
-      document.getElementById('review-summary').innerHTML =
-        `<div style="color:var(--color-text-sub);font-size:14px;padding:var(--space-sm) 0;">尚無評價，成為第一個評價此房源的旅客！</div>`;
-      document.getElementById('review-list').innerHTML = '';
-      document.getElementById('prop-stars').textContent      = '☆☆☆☆☆';
-      document.getElementById('prop-rating-count').textContent = '（尚無評價）';
+      // 無文字評價時，header 仍沿用房源既有評分，與搜尋頁顯示一致（避免「評價沒有同步」）
+      const seededCount  = propData.reviewCount || 0;
+      const seededRating = propData.rating || 0;
+      const filledSeed   = Math.round(seededRating);
+      if (seededCount > 0) {
+        document.getElementById('prop-stars').textContent       = '★'.repeat(filledSeed) + '☆'.repeat(5 - filledSeed) + ' ' + seededRating.toFixed(1);
+        document.getElementById('prop-rating-count').textContent = `（${seededCount} 則評價）`;
+        document.getElementById('review-summary').innerHTML =
+          `<div style="text-align:center;"><div class="review-big-score">${seededRating.toFixed(1)}</div><div style="color:var(--color-accent-yellow);font-size:18px;">${'★'.repeat(filledSeed)}${'☆'.repeat(5-filledSeed)}</div><div style="font-size:12px;color:var(--color-text-sub);margin-top:4px;">${seededCount} 則評價</div></div>`;
+      } else {
+        document.getElementById('prop-stars').textContent       = '☆☆☆☆☆';
+        document.getElementById('prop-rating-count').textContent = '（尚無評價）';
+        document.getElementById('review-summary').innerHTML =
+          `<div style="color:var(--color-text-sub);font-size:14px;padding:var(--space-sm) 0;">尚無評價，成為第一個評價此房源的旅客！</div>`;
+      }
+      document.getElementById('review-list').innerHTML =
+        `<div style="color:var(--color-text-light);font-size:13px;padding:var(--space-md) 0;">目前尚無文字評價</div>`;
       return;
     }
 
@@ -635,8 +648,8 @@
     }
 
     const nights = Math.round((new Date(checkout) - new Date(checkin)) / 86400000);
-    const pricePerNight = propData.priceWeekday;
-    const roomTotal     = pricePerNight * nights;
+    // 房費依每一晚平日/週末/假日分別計價
+    const roomTotal     = calcRoomTotal(propData, checkin, checkout);
     const hasDiscount   = nights >= 2;
     const discounted    = hasDiscount ? Math.round(roomTotal * 0.8) : roomTotal;
     const cleaningFee   = 200;
@@ -650,7 +663,7 @@
     area.innerHTML = `
       <div class="nights-badge">${nights} 晚</div>
       <div class="fee-wrap">
-        <div class="fee-row"><span>NT$ ${pricePerNight.toLocaleString()} × ${nights} 晚</span><span>NT$ ${roomTotal.toLocaleString()}</span></div>
+        <div class="fee-row"><span>房費（${nights} 晚 · 含平假日）</span><span>NT$ ${roomTotal.toLocaleString()}</span></div>
         ${discountRow}
         <div class="fee-row"><span>清潔費</span><span>NT$ ${cleaningFee.toLocaleString()}</span></div>
         <div class="fee-row"><span>服務費（5%）</span><span>NT$ ${serviceFee.toLocaleString()}</span></div>
@@ -666,6 +679,8 @@
     if (!checkin || !checkout || checkin >= checkout) {
       showToast('⚠️ 請先選擇有效的入住與退房日期'); return;
     }
+    const avail = checkAvailability(propId, checkin, checkout);
+    if (!avail.ok) { showToast('⚠️ ' + avail.reason); return; }
     // 先加入購物車再跳轉
     addToCartInternal(checkin, checkout, Number(guests));
     window.location.href = `property-cart.html?direct=1&propId=${encodeURIComponent(propId)}&checkIn=${checkin}&checkOut=${checkout}&guests=${guests}`;
@@ -679,6 +694,8 @@
     if (!checkin || !checkout || checkin >= checkout) {
       showToast('⚠️ 請先選擇有效的入住與退房日期'); return;
     }
+    const avail = checkAvailability(propId, checkin, checkout);
+    if (!avail.ok) { showToast('⚠️ ' + avail.reason); return; }
     addToCartInternal(checkin, checkout, guests);
     showToast(`🛒 已加入購物車：${propData.name}`);
   }
@@ -687,8 +704,8 @@
     const cart = getCart();
     if (cart.some(c => c.propertyId === propId && c.checkIn === checkin)) return;
     const nights       = Math.round((new Date(checkout) - new Date(checkin)) / 86400000);
-    const pricePerNight = propData.priceWeekday;
-    const originalTotal = pricePerNight * nights;
+    const originalTotal = calcRoomTotal(propData, checkin, checkout);   // 平日/週末/假日分別計價
+    const pricePerNight = nights > 0 ? Math.round(originalTotal / nights) : propData.priceWeekday;  // 平均每晚（顯示用）
     const discounted    = nights >= 2 ? Math.round(originalTotal * 0.8) : originalTotal;
     cart.push({
       id:              'cart_' + generateId(),

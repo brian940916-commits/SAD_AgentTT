@@ -339,7 +339,7 @@
           👥 ${c.guests} 人
         </div>
         <div style="margin-top:6px;">
-          <div class="summary-fee-row"><span>NT$ ${c.pricePerNight.toLocaleString()} × ${c.nights} 晚</span><span>NT$ ${c.originalTotal.toLocaleString()}</span></div>
+          <div class="summary-fee-row"><span>房費（${c.nights} 晚 · 含平假日）</span><span>NT$ ${c.originalTotal.toLocaleString()}</span></div>
           ${c.nights >= 2 ? `<div class="summary-fee-row disc"><span>8折優惠</span><span>- NT$ ${(c.originalTotal - c.discountedPrice).toLocaleString()}</span></div>` : ''}
         </div>
       </div>`).join('');
@@ -669,6 +669,15 @@
 
   /* ── 付款處理 → Step 4 ── */
   function processPayment() {
+    // 結帳前再次檢查可訂狀態（房東關閉日期或已被他人預訂）
+    for (const c of cartItems) {
+      const avail = checkAvailability(c.propertyId, c.checkIn, c.checkOut);
+      if (!avail.ok) {
+        alert(`「${c.propertyName}」${avail.reason}，請返回購物車調整後再結帳。`);
+        return;
+      }
+    }
+
     const btn = document.getElementById('pay-btn');
     if (btn) { btn.disabled = true; btn.textContent = '處理中…'; }
 
