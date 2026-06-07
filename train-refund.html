@@ -187,7 +187,7 @@
             <div class="calc-card">
               <div class="calc-title">退款試算</div>
               <div class="calc-row">
-                <span>票券原價</span>
+                <span>實付金額</span>
                 <span id="calc-original-price">—</span>
               </div>
               <div class="calc-row">
@@ -398,7 +398,8 @@ function loadRefundTickets() {
   const list = document.getElementById('refund-ticket-list');
   if (!user) { list.innerHTML = emptyBox('請先登入'); return; }
 
-  const tickets = getTicketsByUser(user.id).filter(t => t.status === 'unused');
+  // 排除已過發車日的車票：過期車票不可退款
+  const tickets = getTicketsByUser(user.id).filter(t => t.status === 'unused' && calcDaysUntil(t.date) >= 0);
   if (!tickets.length) {
     list.innerHTML = emptyBox('目前沒有可退票的票券');
     return;
@@ -461,13 +462,15 @@ function getDaysBadgeClass(days) {
 }
 
 function renderRefundCalc(ticket) {
+  // 以實付金額（已扣優惠券/點數）為退款基準，退款不會高於實付金額
+  const paid     = ticket.paidPrice != null ? ticket.paidPrice : ticket.price;
   const days     = calcDaysUntil(ticket.date);
   const feeRate  = getFeeRate(days);
-  const fee      = Math.ceil(ticket.price * feeRate);
-  const refund   = ticket.price - fee;
+  const fee      = Math.ceil(paid * feeRate);
+  const refund   = paid - fee;
   const badgeCls = getDaysBadgeClass(days);
 
-  document.getElementById('calc-original-price').textContent = `NT$${ticket.price}`;
+  document.getElementById('calc-original-price').textContent = `NT$${paid}`;
   document.getElementById('calc-days').innerHTML = `<span class="days-badge ${badgeCls}">距發車 ${days} 天</span>`;
   document.getElementById('calc-fee').textContent = `NT$${fee}（${Math.round(feeRate * 100)}%）`;
   document.getElementById('calc-refund').textContent = `NT$${refund}`;
@@ -488,6 +491,7 @@ function submitRefund() {
   if (!selectedRefundTicket) return;
   const ticket = getTicketById(selectedRefundTicket.id);
   if (!ticket || ticket.status !== 'unused') { alert('此票券無法退票'); return; }
+  if (calcDaysUntil(ticket.date) < 0) { alert('已過發車日，過期車票無法退票'); return; }
 
   if (!confirm(`確認退票？\n${ticket.fromStation} → ${ticket.toStation}（${ticket.date}）\n票款將於 3–5 個工作天退回。`)) return;
 
@@ -511,7 +515,8 @@ function loadChangeTickets() {
   const list = document.getElementById('change-ticket-list');
   if (!user) { list.innerHTML = emptyBox('請先登入'); return; }
 
-  const tickets = getTicketsByUser(user.id).filter(t => t.status === 'unused');
+  // 排除已過發車日的車票：過期車票不可改票
+  const tickets = getTicketsByUser(user.id).filter(t => t.status === 'unused' && calcDaysUntil(t.date) >= 0);
   if (!tickets.length) {
     list.innerHTML = emptyBox('目前沒有可改票的票券');
     return;

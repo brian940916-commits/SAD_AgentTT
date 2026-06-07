@@ -446,6 +446,7 @@ let carType = 'standard';
 let usedPoints = 0;
 let couponId   = null;
 let lastTicketId = null;
+let lastOrderTicketIds = [];   // 本次訂單產生的所有票券 id，供「加入行程」一次連結全部
 
 /* ── 時間制折扣 ── */
 function getTimeDiscount() {
@@ -658,15 +659,17 @@ function calcTotal() {
     }
   }
 
+  const couponChecked = couponId && document.getElementById('coupon-check') && document.getElementById('coupon-check').checked;
+  const afterCoupon = couponChecked ? Math.round(afterTimeDisc * 0.8) : afterTimeDisc;
+
+  // 點數折抵上限以「折券後應付金額」為準，避免用券時點數超扣（折抵超過實際應付）
   const pts = parseInt(document.getElementById('points-input').value) || 0;
-  usedPoints = Math.max(0, Math.min(pts, getPoints(), afterTimeDisc));
+  usedPoints = Math.max(0, Math.min(pts, getPoints(), afterCoupon));
   if ((parseInt(document.getElementById('points-input').value)||0) !== usedPoints) {
     document.getElementById('points-input').value = usedPoints;
   }
   document.getElementById('points-info').textContent = usedPoints > 0 ? `折抵 NT$${usedPoints}` : '';
 
-  const couponChecked = couponId && document.getElementById('coupon-check') && document.getElementById('coupon-check').checked;
-  const afterCoupon = couponChecked ? Math.round(afterTimeDisc * 0.8) : afterTimeDisc;
   const finalTotal  = Math.max(0, afterCoupon - usedPoints);
 
   // 時間制折扣橫幅
@@ -758,14 +761,36 @@ function confirmPay() {
   const altSeat = document.getElementById('alt-seat-check')?.checked ?? true;
   const timeDisc = getTimeDiscount();
   const carRatio = carType === 'free' ? 0.9 : 1;
+  const couponRatio = couponChecked ? 0.8 : 1;
+
+  // 先算每張票的票面價與總票面，把「優惠券折扣＋點數折抵」按比例分攤到各票，
+  // 讓每張票記錄的實付金額（paidPrice）加總＝實際付款金額，退票才不會退得比實付多。
+  const faceList = [];
+  TICKET_TYPES.forEach(t => {
+    for (let i = 0; i < qtys[t.key]; i++) {
+      const basePrice = Math.round(P.total * t.ratio);
+      faceList.push(Math.round(basePrice * carRatio * timeDisc.ratio));
+    }
+  });
+  const faceSum   = faceList.reduce((a, b) => a + b, 0);
+  const paidTotal = Math.max(0, Math.round(faceSum * couponRatio) - (usedPoints || 0));
 
   const ticketIds = [];
+  let faceIdx = 0;
+  let paidRemaining = paidTotal;
   TICKET_TYPES.forEach(t => {
     for (let i = 0; i < qtys[t.key]; i++) {
       const name  = document.getElementById(`p-name-${t.key}-${i}`)?.value.trim() || '乘客';
       const phone = document.getElementById(`p-phone-${t.key}-${i}`)?.value.trim() || '';
       const basePrice = Math.round(P.total * t.ratio);
       const finalPrice = Math.round(basePrice * carRatio * timeDisc.ratio);
+      // 實付金額：按票面比例分攤；最後一張用剩餘值補齊以避免四捨五入誤差
+      const isLastTicket = faceIdx === faceList.length - 1;
+      const paidPrice = isLastTicket
+        ? Math.max(0, paidRemaining)
+        : (faceSum > 0 ? Math.round(finalPrice / faceSum * paidTotal) : 0);
+      paidRemaining -= paidPrice;
+      faceIdx++;
       const carNo  = Math.floor(Math.random() * 8) + 1;
       const seatNo = Math.floor(Math.random() * 60) + 1;
       const ticket = {
@@ -780,6 +805,7 @@ function confirmPay() {
         date:            P.date,
         ticketType:      t.key,
         price:           finalPrice,
+        paidPrice:       paidPrice,
         passengerName:   name,
         passengerPhone:  phone,
         status:          'unused',
@@ -798,7 +824,8 @@ function confirmPay() {
     }
   });
 
-  lastTicketId = ticketIds[0];
+  lastTicketId       = ticketIds[0];
+  lastOrderTicketIds = ticketIds.slice();
   addPoints(9, '訂票點數');
 
   // 顯示成功
@@ -829,7 +856,9 @@ function skipLink() {
 function confirmLink() {
   const tripId = document.getElementById('trip-select').value;
   if (!tripId) { alert('請選擇行程'); return; }
-  if (lastTicketId) linkTicketToTrip(lastTicketId, tripId);
+  // 將本次訂單的所有票券都加入行程（多張票時不再只連結第一張）
+  const ids = lastOrderTicketIds.length ? lastOrderTicketIds : (lastTicketId ? [lastTicketId] : []);
+  ids.forEach(id => linkTicketToTrip(id, tripId));
   document.getElementById('link-trip-modal').classList.remove('open');
 }
 

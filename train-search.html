@@ -608,7 +608,10 @@ function setDefaultDate() {
   const yyyy = today.getFullYear();
   const mm   = pad2(today.getMonth() + 1);
   const dd   = pad2(today.getDate());
-  document.getElementById('travel-date').value = `${yyyy}-${mm}-${dd}`;
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+  const dateEl = document.getElementById('travel-date');
+  dateEl.value = todayStr;
+  dateEl.min   = todayStr;   // 不可查詢已過期的日期
 }
 
 function swapStations() {
@@ -643,6 +646,11 @@ function searchTrains() {
 
   if (!date) {
     alert('請選擇乘車日期');
+    return;
+  }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (date < todayStr) {
+    alert('乘車日期不可早於今天，請重新選擇');
     return;
   }
   if (from === to) {
