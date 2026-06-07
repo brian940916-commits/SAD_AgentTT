@@ -396,6 +396,8 @@ function showTab(id, el) {
 
 /* ══════════════════════ AI 諮詢 ══════════════════════ */
 let isHumanMode = false;
+let chatLog = [];                  // 記錄對話，轉人工時帶入客訴工單
+let activeHumanComplaintId = null; // 轉人工後建立的客訴工單 id
 
 /* 硬編碼 AI 回覆 */
 const AI_ANSWERS = {
@@ -422,12 +424,14 @@ function addAIMsg(text) {
   const avatarCls = isHuman ? 'human' : 'ai';
   const bubbleCls = isHuman ? 'human' : 'ai';
   appendMsg(avatar, avatarCls, text, bubbleCls, false);
+  chatLog.push({ role: 'ai', text, createdAt: nowISO() });
 }
 
 function addUserMsg(text) {
   const user = getCurrentUser();
   const initial = user ? user.name.charAt(0) : '我';
   appendMsg(initial, 'user', text, 'user', true);
+  chatLog.push({ role: 'user', text, createdAt: nowISO() });
 }
 
 function appendMsg(avatar, avatarCls, text, bubbleCls, isUser) {
@@ -462,6 +466,7 @@ function sendUserMsg() {
   input.value = '';
 
   if (isHumanMode) {
+    persistHumanUserMsg(text);
     setTimeout(() => {
       addAIMsg('謝謝您的訊息，人工客服正在為您處理，請稍候…');
     }, 800);
@@ -486,6 +491,7 @@ function askQuick(category) {
 }
 
 function transferToHuman() {
+  if (isHumanMode) return;
   isHumanMode = true;
   document.getElementById('chat-avatar').textContent = '👤';
   document.getElementById('chat-agent-name').textContent = '人工客服';
@@ -494,7 +500,73 @@ function transferToHuman() {
   document.getElementById('transfer-btn').textContent = '✓ 已轉接';
   document.getElementById('transfer-btn').disabled = true;
   document.getElementById('quick-btns').style.display = 'none';
-  addAIMsg('您好，我是 Agent TT 人工客服 👤\n\n感謝您的等候，請問有什麼可以協助您的？\n（服務時間：週一至週五 09:00–18:00）');
+
+  // 建立真實客訴工單，把使用者問過的訊息帶入，讓管理員可接手
+  const c = createHumanComplaint();
+  if (c) {
+    activeHumanComplaintId = c.id;
+    addAIMsg(`您好，我是 Agent TT 人工客服 👤\n\n已為您建立客服案件 **${c.caseNo}**，後續客服回覆會同步到「我的客訴」，您可前往查看並繼續對話。\n\n請問有什麼可以協助您的？`);
+  } else {
+    addAIMsg('您好，我是 Agent TT 人工客服 👤\n\n感謝您的等候，請問有什麼可以協助您的？\n（提醒：請先登入才能建立客服案件並保存對話）');
+  }
+}
+
+/* 轉人工時建立客訴工單，帶入聊天中使用者問過的訊息 */
+function createHumanComplaint() {
+  const user = getCurrentUser();
+  if (!user) return null;
+
+  const userMsgs = chatLog.filter(m => m.role === 'user');
+  const firstQ   = userMsgs.length ? userMsgs[0].text : '使用者透過 AI 客服轉接人工';
+  const now      = new Date();
+  const caseNo   = 'CS-' + now.getFullYear() + pad2(now.getMonth() + 1) + pad2(now.getDate())
+                 + '-' + Math.floor(Math.random() * 9000 + 1000);
+
+  const complaint = {
+    id:          generateId(),
+    userId:      user.id,
+    userName:    user.name,
+    title:       '人工客服諮詢',
+    type:        '人工客服',
+    orderId:     '',
+    description: '【AI 轉接人工】' + firstQ.slice(0, 60),
+    status:      'active',   // 已進入人工處理中
+    messages:    userMsgs.map(m => ({
+      id:        generateId(),
+      sender:    'user',
+      senderId:  user.id,
+      userId:    user.id,
+      userName:  user.name,
+      text:      m.text,
+      createdAt: m.createdAt,
+    })),
+    createdAt:   now.toISOString(),
+    closedAt:    null,
+    caseNo,
+    source:      'human_chat',
+  };
+  saveComplaint(complaint);
+  return complaint;
+}
+
+/* 轉人工後，使用者後續訊息同步寫入工單 */
+function persistHumanUserMsg(text) {
+  if (!activeHumanComplaintId) return;
+  const c = getComplaintById(activeHumanComplaintId);
+  if (!c || c.status === 'closed') return;
+  const user = getCurrentUser();
+  if (!user) return;
+  c.messages = c.messages || [];
+  c.messages.push({
+    id:        generateId(),
+    sender:    'user',
+    senderId:  user.id,
+    userId:    user.id,
+    userName:  user.name,
+    text,
+    createdAt: nowISO(),
+  });
+  saveComplaint(c);
 }
 
 /* ══════════════════════ 提交客訴 ══════════════════════ */
@@ -604,6 +676,12 @@ function trackCardHTML(c) {
         <span class="track-status-badge ${STATUS_CLS[c.status] || 'status-pending'}">${STATUS_MAP[c.status] || c.status}</span>
       </div>
       <div class="timeline">${stepsHTML}</div>
+      <div style="padding:0 20px 16px;">
+        <button onclick="location.href='train-complaint-list.html?open=${escHtml(c.id)}'"
+          style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:600;font-family:var(--font-main);cursor:pointer;">
+          💬 查看 / 繼續對話
+        </button>
+      </div>
     </div>`;
 }
 

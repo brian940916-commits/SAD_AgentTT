@@ -617,6 +617,8 @@ function validateStep1() {
   if (!start) { showFormError('step1-error', '請選擇出發日期'); return false; }
   if (!end)   { showFormError('step1-error', '請選擇返回日期'); return false; }
   if (end < start) { showFormError('step1-error', '返回日期不能早於出發日期'); return false; }
+  const today = new Date().toISOString().slice(0, 10);
+  if (start < today) { showFormError('step1-error', '出發日期不能早於今天'); return false; }
   hideError('step1-error');
   return true;
 }
@@ -770,6 +772,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('new-trip-end').min   = this.value;
     document.getElementById('new-trip-end').value = '';
   });
+
+  // 帶入首頁搜尋列選擇的車站/日期/人數：自動開啟建立行程並預填
+  const sp      = new URLSearchParams(location.search);
+  const station = sp.get('station') || '';
+  const date    = sp.get('date')    || '';
+  if (station || date) {
+    openCreateModal();
+    if (station) document.getElementById('new-trip-station').value = station;
+    if (date) {
+      const startEl = document.getElementById('new-trip-start');
+      const endEl   = document.getElementById('new-trip-end');
+      const today   = new Date().toISOString().slice(0, 10);
+      // 過期日期不帶入，避免一開啟就違反「不能早於今天」
+      if (date >= today) {
+        startEl.value = date;
+        endEl.min     = date;
+      }
+    }
+  }
 });
 
 /* ────────────────────────────────────────────

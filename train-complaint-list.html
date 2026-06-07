@@ -394,6 +394,13 @@
     }
 
     complaints.forEach(c => root.appendChild(buildCard(c)));
+
+    // 由案件追蹤頁帶 ?open=<id> 進來時，自動展開該案件對話
+    const openId = new URLSearchParams(location.search).get('open');
+    if (openId && document.querySelector(`[data-complaint-id="${openId}"]`) && !openPanels.has(openId)) {
+      toggleChatPanel(openId);
+      document.querySelector(`[data-complaint-id="${openId}"]`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   /* ── 監聽跨分頁更新 ── */
