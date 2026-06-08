@@ -331,6 +331,12 @@
               <div class="photo-prev-row" id="prop-photo-prev"></div>
             </div>
 
+            <div class="form-group">
+              <label class="form-label">常見問答（自動回覆）</label>
+              <textarea class="form-input" id="p-faq" rows="4" placeholder="每行一組，格式：問題 || 回覆&#10;例：有停車場嗎？ || 有免費停車場，車位先到先得。" style="font-size:13px;"></textarea>
+              <div style="font-size:11px;color:var(--color-text-light);margin-top:4px;">顧客在房源頁「聯繫房東」點選問題時，系統會以對應回覆自動答覆（留白則使用預設）。</div>
+            </div>
+
             <div id="add-prop-error" style="color:var(--color-accent-red);font-size:13px;margin-bottom:var(--space-sm);display:none;"></div>
             <div style="display:flex;gap:var(--space-sm);justify-content:flex-end;">
               <button class="btn btn-outline" onclick="toggleAddPanel()">取消</button>
@@ -575,6 +581,7 @@
       });
       currentPhotos = Array.isArray(p.photos) ? p.photos.slice() : [];
       renderPhotoPreview();
+      document.getElementById('p-faq').value = getPropertyFaq(p.id).map(f => `${f.q} || ${f.a}`).join('\n');
     } else {
       editingPropId = '';
       document.getElementById('add-panel-title').textContent = '🏠 新增房源';
@@ -589,6 +596,8 @@
       document.querySelectorAll('.fac-grid input[type=checkbox]').forEach(cb => cb.checked = false);
       currentPhotos = [];
       renderPhotoPreview();
+      // 新房源預設帶入預設 FAQ，方便房東直接編輯
+      document.getElementById('p-faq').value = DEFAULT_FAQ.map(f => `${f.q} || ${f.a}`).join('\n');
     }
     panel.classList.add('open');
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -610,6 +619,12 @@
     const isEdit     = !!editingPropId;
     const existProp  = isEdit ? hostProps.find(p => p.id === editingPropId) : null;
 
+    // 解析常見問答：每行「問題 || 回覆」
+    const faq = document.getElementById('p-faq').value.split('\n')
+      .map(l => l.trim()).filter(Boolean)
+      .map(l => { const i = l.indexOf('||'); return i < 0 ? null : { q: l.slice(0, i).trim(), a: l.slice(i + 2).trim() }; })
+      .filter(x => x && x.q && x.a);
+
     const prop = {
       id:           isEdit ? editingPropId : generateId(),
       hostId:       currentUser.id,
@@ -625,6 +640,7 @@
       priceHoliday: Number(document.getElementById('p-price-h').value) || 0,
       facilities,
       photos:       currentPhotos.slice(),
+      faq,
       status:       'pending',
       rejectReason: '',
       rating:       existProp?.rating || 0,

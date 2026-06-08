@@ -321,7 +321,7 @@
           <div style="display:flex;flex-direction:column;gap:var(--space-sm);margin-top:var(--space-md);" id="bc-actions">
             <button class="btn btn-primary btn-full" onclick="bookNow()">立即訂房</button>
             <button class="btn btn-outline btn-full" onclick="addToCartDetail()">加入購物車</button>
-            <button class="btn btn-ghost btn-full" onclick="openChat()">💬 聯繫房東</button>
+            <button class="btn btn-ghost btn-full" onclick="contactHost()">💬 聯繫房東</button>
           </div>
         </div>
       </div>
@@ -330,34 +330,8 @@
   </div>
 </div>
 
-<!-- 聊天室 FAB -->
-<button class="chat-fab" onclick="toggleChat()" id="chat-fab" aria-label="聯繫房東">
-  💬
-  <span class="chat-unread" id="chat-unread" style="display:none;">1</span>
-</button>
-
-<!-- 聊天視窗 -->
-<div class="chat-window" id="chat-window" role="dialog" aria-label="聊天室" aria-modal="true">
-  <div class="chat-win-head">
-    <div class="chat-host-avatar">🏠</div>
-    <div>
-      <div class="chat-host-name" id="chat-host-name">房東</div>
-      <div class="chat-host-status" id="chat-status">通常 30 分鐘內回覆</div>
-    </div>
-    <button class="chat-win-close" onclick="closeChat()" aria-label="關閉">✕</button>
-  </div>
-  <div class="chat-messages" id="chat-messages"><!-- 動態填入 --></div>
-  <div class="chat-canned">
-    <button class="canned-btn" onclick="sendCanned('如何前往房間？')">🗺 房間導航</button>
-    <button class="canned-btn" onclick="sendCanned('可以寄放行李嗎？')">🧳 行李寄放</button>
-    <button class="canned-btn" onclick="sendCanned('有停車場嗎？')">🚗 停車資訊</button>
-    <button class="canned-btn" onclick="sendCanned('幾點供應早餐？')">🍳 早餐時間</button>
-  </div>
-  <div class="chat-input-row">
-    <input class="chat-input" type="text" id="chat-input" placeholder="輸入訊息…" onkeydown="onChatKey(event)">
-    <button class="chat-send" onclick="sendMsg()" aria-label="送出">➤</button>
-  </div>
-</div>
+<!-- 聯繫房東 FAB（開啟共用聊天 Modal）-->
+<button class="chat-fab" onclick="contactHost()" id="chat-fab" aria-label="聯繫房東">💬</button>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -429,9 +403,6 @@
   const params  = new URLSearchParams(window.location.search);
   const propId  = params.get('id');
   let   propData = null;
-  let   chatOpen = false;
-  let   inquiryConv = null;   // 與房東的「訂房前詢問」對話（真實訊息系統）
-  let   chatPollTimer = null;
 
   /* ── 初始化 ── */
   function init() {
@@ -449,7 +420,6 @@
     renderReviews();
     prefillDates();
     renderFavBtn();
-    initChat();
   }
 
   /* ── 標題 ── */
@@ -768,114 +738,14 @@
       .catch(() => showToast('請手動複製網址列'));
   }
 
-  /* ── 聊天室 ── */
-  const CANNED_ANSWERS = {
-    '如何前往房間？':   '您好！辦理入住後工作人員會親自帶您到房間，停車場在大門左側，步行約30秒即可抵達。如需協助請隨時告知🙏',
-    '可以寄放行李嗎？': '當然可以！我們提供免費行李寄放服務，入住前或退房後均可寄放，請於前台登記即可🧳',
-    '有停車場嗎？':     '有的！我們有免費自用停車場，共10個車位，先到先得。如停車位已滿，附近200公尺處有公共停車場🚗',
-    '幾點供應早餐？':   '早餐時間為 07:30–09:30，在一樓餐廳供應。菜單包含台式飲品和在地農產食材，歡迎享用🍳',
-  };
-
-  function initChat() {
-    // 建立／取得與房東的「訂房前詢問」對話（真實訊息系統，房東訊息中心可見）
-    inquiryConv = getOrCreateInquiryConversation(propData, currentUser);
-    // 首次進入時，由系統代房東送出歡迎訊息（房東也看得到此自動回覆）
-    if (inquiryConv && inquiryConv.messages.length === 0) {
-      pushAutoReply(inquiryConv.bookingId, `您好！歡迎詢問「${propData.name}」，有任何問題都可以問我，或點選下方常見問題 😊`);
-    }
-    renderChatMessages();
-    updateChatUnread();
-  }
-
-  function refreshConv() { inquiryConv = getConversationByBookingId(inquiryConv?.bookingId); }
-
-  function updateChatUnread() {
-    refreshConv();
-    const badge = document.getElementById('chat-unread');
-    const unread = inquiryConv
-      ? inquiryConv.messages.filter(m => m.senderRole === 'host' && !(m.readBy || []).includes(currentUser.id)).length
-      : 0;
-    if (unread > 0 && !chatOpen) { badge.textContent = unread > 9 ? '9+' : unread; badge.style.display = 'flex'; }
-    else badge.style.display = 'none';
-  }
-
-  function toggleChat() {
-    chatOpen = !chatOpen;
-    document.getElementById('chat-window').classList.toggle('open', chatOpen);
-    if (chatOpen) {
-      if (inquiryConv) markConversationRead(inquiryConv.bookingId, currentUser.id);
-      document.getElementById('chat-unread').style.display = 'none';
-      renderChatMessages();
-      document.getElementById('chat-input').focus();
-      // 輪詢房東於訊息中心的回覆
-      if (chatPollTimer) clearInterval(chatPollTimer);
-      chatPollTimer = setInterval(() => {
-        renderChatMessages();
-        if (inquiryConv) markConversationRead(inquiryConv.bookingId, currentUser.id);
-      }, 2000);
-    } else if (chatPollTimer) {
-      clearInterval(chatPollTimer); chatPollTimer = null;
-    }
-  }
-  function openChat()  { if (!chatOpen) toggleChat(); }
-  function closeChat() { if (chatOpen)  toggleChat(); }
-
-  function renderChatMessages() {
-    refreshConv();
-    const msgs = inquiryConv ? inquiryConv.messages : [];
-    document.getElementById('chat-messages').innerHTML = msgs.map(m => {
-      const isMine  = m.senderRole === 'guest';
-      const initial = isMine ? (currentUser.name || '我').slice(0,1) : '🏠';
-      return `
-        <div class="chat-msg ${isMine ? 'mine' : ''}">
-          <div class="chat-msg-avatar">${initial}</div>
-          <div class="chat-bubble">${escHtml(m.text)}</div>
-        </div>`;
-    }).join('');
-    scrollChatBottom();
-  }
-
-  function scrollChatBottom() {
-    const box = document.getElementById('chat-messages');
-    setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
-  }
-
-  /* 顧客送出訊息 → 寫入對話，並由系統代房東自動回覆 */
-  function pushGuestMsg(text) {
-    if (!inquiryConv) return;
-    sendMessage(inquiryConv.bookingId, 'guest', text);
-    renderChatMessages();
-    setTimeout(() => {
-      const reply = CANNED_ANSWERS[text] || '感謝您的詢問，房東會盡快回覆您！如急需協助可於完成訂房後於「我的訂單」聯繫。';
-      pushAutoReply(inquiryConv.bookingId, reply);
-      renderChatMessages();
-    }, 700);
-  }
-
-  function sendMsg() {
-    const input = document.getElementById('chat-input');
-    const text  = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    pushGuestMsg(text);
-  }
-
-  function sendCanned(text) {
-    if (!chatOpen) toggleChat();
-    pushGuestMsg(text);
-  }
-
-  function onChatKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
-  }
-
-  /* ── 更新聊天室 head（房東名）── */
-  function updateChatHead() {
-    document.getElementById('chat-host-name').textContent = propData.name + '・房東';
+  /* ── 聯繫房東（共用聊天 Modal）── */
+  function contactHost() {
+    const conv = getOrCreateInquiryConversation(propData, currentUser);
+    if (!conv) { showToast('請先登入後再聯繫房東'); return; }
+    window.openChatModal(conv.bookingId);
   }
 
   init();
-  updateChatHead();
 </script>
 </body>
 </html>

@@ -10,6 +10,17 @@
   let currentBookingId = null;
   let pollTimer        = null;
 
+  // 訂房後顧客快速訊息（純送出，由房東本人回覆，不自動回覆）
+  const POST_BOOKING_GUEST_CANNED = [
+    '請問可以提早入住嗎？', '方便提供停車資訊嗎？',
+    '我可能會晚一點到，沒問題嗎？', '請問退房時間是幾點？',
+  ];
+  // 房東快速回覆（填入輸入框讓房東微調再送）
+  const HOST_CANNED = [
+    '您好！已收到您的訊息，我盡快回覆您 🙏', '可以的，沒問題！',
+    '麻煩您提供訂單編號，我為您查詢。', '感謝您的詢問，期待您的入住 😊',
+  ];
+
   function _esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -106,6 +117,16 @@
       }
       .att-chat-send:hover { background: #1f3a30; }
       .att-chat-send:disabled { background: #999; cursor: not-allowed; }
+      .att-chat-canned {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        padding: 8px 12px 0; background: #FAF6EC;
+      }
+      .att-canned-chip {
+        padding: 4px 10px; border: 1.5px solid #E5DFCB; border-radius: 16px;
+        font-size: 12px; cursor: pointer; background: #fff; color: #5a5040;
+        font-family: inherit; transition: all .15s; white-space: nowrap;
+      }
+      .att-canned-chip:hover { border-color: #2C4A3E; color: #2C4A3E; }
     `;
     document.head.appendChild(style);
 
@@ -122,6 +143,7 @@
           <button class="att-chat-close" id="att-chat-close" aria-label="關閉">✕</button>
         </div>
         <div class="att-chat-body" id="att-chat-body"></div>
+        <div class="att-chat-canned" id="att-chat-canned"></div>
         <div class="att-chat-foot">
           <textarea class="att-chat-input" id="att-chat-input"
             placeholder="輸入訊息…" rows="1"></textarea>
@@ -135,6 +157,17 @@
     });
     document.getElementById('att-chat-close').addEventListener('click', _close);
     document.getElementById('att-chat-send').addEventListener('click', _send);
+    document.getElementById('att-chat-canned').addEventListener('click', e => {
+      const chip = e.target.closest('.att-canned-chip');
+      if (!chip) return;
+      const text = chip.dataset.text;
+      if (chip.dataset.action === 'fill') {
+        const input = document.getElementById('att-chat-input');
+        input.value = text; input.focus();
+      } else {
+        _sendText(text, chip.dataset.action === 'send-faq');
+      }
+    });
     document.getElementById('att-chat-input').addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -178,21 +211,55 @@
       }).join('');
     }
     bodyEl.scrollTop = bodyEl.scrollHeight;
+
+    _renderCanned(conv, user);
+  }
+
+  // 依角色與對話類型顯示罐頭按鈕
+  function _renderCanned(conv, user) {
+    const el = document.getElementById('att-chat-canned');
+    let chips;
+    if (user.role === 'host') {
+      chips = HOST_CANNED.map(t => ({ text: t, action: 'fill' }));                 // 房東：填入再送
+    } else if (conv.type === 'inquiry') {
+      chips = getPropertyFaq(conv.propertyId).map(f => ({ text: f.q, action: 'send-faq' })); // 訂房前：FAQ 提問（觸發自動回覆）
+    } else {
+      chips = POST_BOOKING_GUEST_CANNED.map(t => ({ text: t, action: 'send' }));    // 訂房後：通用快速訊息
+    }
+    el.innerHTML = chips.map(c => {
+      const label = c.text.length > 14 ? c.text.slice(0, 14) + '…' : c.text;
+      return `<button class="att-canned-chip" data-text="${_esc(c.text)}" data-action="${c.action}">${_esc(label)}</button>`;
+    }).join('');
+  }
+
+  // 送出一則訊息（text）；fromFaq=true 時於訂房前諮詢由系統代房東自動回覆
+  function _sendText(text, fromFaq) {
+    if (!currentBookingId || !text) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    const senderRole = user.role === 'host' ? 'host' : 'guest';
+    sendMessage(currentBookingId, senderRole, text);
+    _render();
+    window.dispatchEvent(new Event('agenttt:unread-changed'));
+
+    if (fromFaq && senderRole === 'guest') {
+      const conv = getConversationByBookingId(currentBookingId);
+      const faq  = conv ? getPropertyFaq(conv.propertyId) : [];
+      const hit  = faq.find(f => f.q === text);
+      const reply = hit ? hit.a : '感謝您的詢問，房東會盡快回覆您！如需即時協助，完成訂房後可於「我的訂單」聯繫。';
+      setTimeout(() => { pushAutoReply(currentBookingId, reply); _render(); }, 700);
+    }
   }
 
   function _send() {
-    if (!currentBookingId) return;
-    const user = getCurrentUser();
-    if (!user) return;
     const input = document.getElementById('att-chat-input');
     const text  = input.value.trim();
     if (!text) return;
-
-    const senderRole = user.role === 'host' ? 'host' : 'guest';
-    sendMessage(currentBookingId, senderRole, text);
     input.value = '';
-    _render();
-    window.dispatchEvent(new Event('agenttt:unread-changed'));
+    const conv = getConversationByBookingId(currentBookingId);
+    const user = getCurrentUser();
+    const guestInquiry = !!conv && conv.type === 'inquiry' && !!user && user.role !== 'host';
+    _sendText(text, guestInquiry);
   }
 
   function _close() {
@@ -206,24 +273,33 @@
     if (e.key === 'agenttt_messages' && currentBookingId) _render();
   }
 
-  window.openChatModal = function(bookingId) {
+  window.openChatModal = function(key) {
     _injectOnce();
 
     const user = getCurrentUser();
     if (!user) { alert('請先登入'); return; }
 
-    const booking = getBookingById(bookingId);
-    if (!booking) { console.warn('[shared-chat] booking not found:', bookingId); return; }
+    // 支援兩種對話：訂房後（bookingId）與訂房前諮詢（inq_ 合成鍵）
+    let conv = getConversationByBookingId(key);
+    if (!conv) {
+      const booking = getBookingById(key);
+      if (booking) conv = getOrCreateConversation(booking);
+    }
+    if (!conv) { console.warn('[shared-chat] conversation not found:', key); return; }
 
-    getOrCreateConversation(booking);
-    currentBookingId = bookingId;
+    // 訂房前諮詢：首次開啟由系統代房東送出歡迎自動回覆
+    if (conv.type === 'inquiry' && conv.messages.length === 0) {
+      pushAutoReply(conv.bookingId, `您好！歡迎詢問「${conv.propertyName}」，有任何問題都可以問我，或點選下方常見問題 😊`);
+    }
+
+    currentBookingId = conv.bookingId;
 
     document.getElementById('att-chat-input').value = '';
     document.getElementById(MODAL_ID).classList.add('open');
     document.body.style.overflow = 'hidden';
 
     _render();
-    markConversationRead(bookingId, user.id);
+    markConversationRead(currentBookingId, user.id);
     window.dispatchEvent(new Event('agenttt:unread-changed'));
 
     if (pollTimer) clearInterval(pollTimer);

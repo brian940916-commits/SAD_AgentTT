@@ -504,6 +504,26 @@ function pushAutoReply(conversationKey, text) {
   return msg;
 }
 
+/* 房源常見問答（房東可自訂；未設定則用預設）。訂房前諮詢用於罐頭提問與自動回覆。 */
+const DEFAULT_FAQ = [
+  { q: '如何前往房間？',   a: '辦理入住後工作人員會帶您到房間，停車場在大門左側，步行約 30 秒即可抵達 🙏' },
+  { q: '可以寄放行李嗎？', a: '可以！我們提供免費行李寄放服務，入住前或退房後均可，請於前台登記 🧳' },
+  { q: '有停車場嗎？',     a: '有免費自用停車場，車位先到先得；若已滿，附近 200 公尺處有公共停車場 🚗' },
+  { q: '幾點供應早餐？',   a: '早餐時間為 07:30–09:30，於一樓餐廳供應，採用在地食材 🍳' },
+];
+
+function getPropertyFaq(propertyId) {
+  const p = getPropertyById(propertyId);
+  return (p && Array.isArray(p.faq) && p.faq.length) ? p.faq : DEFAULT_FAQ;
+}
+
+function savePropertyFaq(propertyId, faq) {
+  const p = getPropertyById(propertyId);
+  if (!p) return;
+  p.faq = Array.isArray(faq) ? faq : [];
+  saveProperty(p);
+}
+
 function markConversationRead(bookingId, userId) {
   const convs = getConversations();
   const idx = convs.findIndex(c => c.bookingId === bookingId);
