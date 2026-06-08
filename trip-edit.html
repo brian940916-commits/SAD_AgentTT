@@ -275,9 +275,15 @@
               <label class="form-label">名稱 <span style="color:var(--color-accent-red)">*</span></label>
               <input class="form-input" type="text" id="new-item-name" placeholder="景點/餐廳/活動名稱" style="padding:8px 10px;"/>
             </div>
-            <div class="form-group" style="margin-bottom:var(--space-sm);">
-              <label class="form-label">備註</label>
-              <input class="form-input" type="text" id="new-item-note" placeholder="備註（選填）" style="padding:8px 10px;"/>
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-sm);margin-bottom:var(--space-sm);">
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">備註</label>
+                <input class="form-input" type="text" id="new-item-note" placeholder="備註（選填）" style="padding:8px 10px;"/>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label class="form-label">距車站(km)</label>
+                <input class="form-input" type="number" id="new-item-distance" min="0" step="0.1" placeholder="選填" style="padding:8px 10px;"/>
+              </div>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);">
               <div style="display:flex;gap:var(--space-sm);align-items:center;">
@@ -357,9 +363,15 @@
           <input class="form-input" type="time" id="edit-item-end"/>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">備註</label>
-        <input class="form-input" type="text" id="edit-item-note" placeholder="備註（選填）"/>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-md);">
+        <div class="form-group">
+          <label class="form-label">備註</label>
+          <input class="form-input" type="text" id="edit-item-note" placeholder="備註（選填）"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">距車站(km)</label>
+          <input class="form-input" type="number" id="edit-item-distance" min="0" step="0.1" placeholder="選填"/>
+        </div>
       </div>
       <div style="display:flex;gap:var(--space-lg);align-items:center;">
         <span style="font-size:13px;color:var(--color-text-sub);">優先順序：</span>
@@ -702,6 +714,9 @@ function itemCardHTML(item) {
   const timePart = item.time
     ? `<span>🕐 ${item.time}${item.endTime ? ' — ' + item.endTime : ''}</span>`
     : '';
+  const distPart = (item.distance != null)
+    ? `<span style="margin-left:${item.time ? '10px' : '0'};">📍 距車站 ${item.distance} km</span>`
+    : '';
   const notePart = item.note
     ? `<div class="item-note" title="${escHtml(item.note)}">📝 ${escHtml(item.note.slice(0,60))}${item.note.length>60?'…':''}</div>`
     : '';
@@ -728,7 +743,7 @@ function itemCardHTML(item) {
                   title="點擊切換優先順序">${priLabel}</button>
           ${linkBadge}
         </div>
-        <div class="item-meta">${timePart}</div>
+        <div class="item-meta">${timePart}${distPart}</div>
         ${notePart}
       </div>
 
@@ -880,6 +895,7 @@ function closeAddPanel() {
   document.getElementById('new-item-note').value = '';
   document.getElementById('new-item-start').value = '';
   document.getElementById('new-item-end').value   = '';
+  document.getElementById('new-item-distance').value = '';
   document.querySelector('[name="new-priority"][value="candidate"]').checked = true;
   hideAddError();
 }
@@ -898,6 +914,8 @@ function addItem() {
   const start    = document.getElementById('new-item-start').value;
   const end      = document.getElementById('new-item-end').value;
   const note     = document.getElementById('new-item-note').value.trim();
+  const distRaw  = document.getElementById('new-item-distance').value;
+  const distance = distRaw !== '' && !isNaN(parseFloat(distRaw)) ? parseFloat(distRaw) : null;
   const priority = document.querySelector('[name="new-priority"]:checked')?.value || 'candidate';
 
   const dayItems = (tripData.items||[]).filter(i => i.day === currentDay);
@@ -912,6 +930,7 @@ function addItem() {
     time:            start,
     endTime:         end,
     note,
+    distance,
     priority,
     order:           maxOrder + 1,
     linkedTicketId:  null,
@@ -947,6 +966,7 @@ function openEditModal(itemId) {
   document.getElementById('edit-item-start').value  = item.time    || '';
   document.getElementById('edit-item-end').value    = item.endTime || '';
   document.getElementById('edit-item-note').value   = item.note    || '';
+  document.getElementById('edit-item-distance').value = (item.distance != null) ? item.distance : '';
 
   const priInput = document.querySelector(`[name="edit-priority"][value="${item.priority||'candidate'}"]`);
   if (priInput) priInput.checked = true;
@@ -979,12 +999,14 @@ function saveEditItem() {
   const start    = document.getElementById('edit-item-start').value;
   const end      = document.getElementById('edit-item-end').value;
   const note     = document.getElementById('edit-item-note').value.trim();
+  const distRaw  = document.getElementById('edit-item-distance').value;
+  const distance = distRaw !== '' && !isNaN(parseFloat(distRaw)) ? parseFloat(distRaw) : null;
   const priority = document.querySelector('[name="edit-priority"]:checked')?.value || 'candidate';
 
   const item = (tripData.items||[]).find(i => i.id === itemId);
   if (!item) return;
 
-  Object.assign(item, { name, type, time: start, endTime: end, note, priority });
+  Object.assign(item, { name, type, time: start, endTime: end, note, distance, priority });
   addLog('編輯項目', `修改了「${name}」的資訊`);
   saveTrip(tripData);
   closeEditModal();

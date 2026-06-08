@@ -391,7 +391,7 @@ function renderCards() {
           <div class="attraction-name">${escHtml(a.name)}</div>
           <div class="attraction-desc">${escHtml(a.desc)}</div>
           <div class="attraction-meta">
-            <span>📍 ${a.distance} km</span>
+            <span>📍 距車站 ${a.distance} km</span>
             <span>⏱ 約 ${dur}</span>
           </div>
         </div>
@@ -453,6 +453,7 @@ function addToTrip() {
     time:            '',
     endTime:         '',
     note:            a.desc,
+    distance:        a.distance,
     priority:        'candidate',
     order:           nextOrder++,
     linkedTicketId:  null,
