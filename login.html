@@ -574,11 +574,10 @@ const GOOGLE_LOGO = `<svg class="gauth-logo" viewBox="0 0 75 24" width="75" heig
   <path fill="#EA4335" d="M7.2 4.6c1.07 0 2.03.37 2.79 1.1l2.07-2.07A7.2 7.2 0 00.7 7.74L3.12 9.6c.58-1.72 2.18-3 4.08-3z" transform="translate(8,3) scale(0.9)"/>
 </g></svg>`;
 
-// demo Google 帳戶（僅供流程示意；對應平台測試帳號的身份）
+// demo Google 帳戶（對應平台測試帳號的身份；管理員不開放 Google 登入）
 const GOOGLE_DEMO_ACCOUNTS = [
   { name: '小旅 (旅客)',  email: 'test@test.com',  color: '#C4514A' },
   { name: '房東阿明',     email: 'host@test.com',  color: '#2C4A3E' },
-  { name: '平台管理員',   email: 'admin@test.com', color: '#1A3A2E' },
 ];
 
 function openGoogleAuth() {
@@ -629,17 +628,33 @@ function gauthSigningIn(idx) {
       <div style="font-size:16px;color:#202124;">正在登入…</div>
       <div class="gauth-sub" style="margin-top:8px;">${acct.email || acct.name}</div>
     </div>`;
-  setTimeout(() => gauthDone(acct), 1400);
+  setTimeout(() => gauthDone(acct, idx), 1400);
 }
 
-/* 步驟三：完成（示意，不寫入登入狀態） */
-function gauthDone(acct) {
+/* 步驟三：完成 —— demo 帳戶會真正登入並導向首頁 */
+function gauthDone(acct, idx) {
+  // demo 帳戶：比對平台帳號，真正寫入登入狀態並跳轉
+  const user = idx >= 0 ? findUserByEmail(acct.email) : null;
+  if (user) {
+    document.getElementById('gauth-card').innerHTML = `
+      <div class="gauth-center">
+        <div class="gauth-done-check">✓</div>
+        <div style="font-size:18px;color:#202124;">已完成 Google 驗證</div>
+        <div class="gauth-sub" style="margin-top:8px;">${acct.email}</div>
+        <div class="gauth-sub" style="margin-top:14px;">正在進入 Agent TT…</div>
+      </div>`;
+    setCurrentUser(user);
+    setTimeout(() => redirectByRole(user.role), 900);
+    return;
+  }
+
+  // 「使用其他帳戶」：無對應平台帳號，僅示意
   document.getElementById('gauth-card').innerHTML = `
     <div class="gauth-center">
       <div class="gauth-done-check">✓</div>
       <div style="font-size:18px;color:#202124;">已完成 Google 驗證</div>
       <div class="gauth-sub" style="margin-top:8px;">${acct.email || acct.name}</div>
-      <div class="gauth-sub" style="margin-top:14px;color:#9aa0a6;">（流程示意：實際整合後將自動登入並導向首頁）</div>
+      <div class="gauth-sub" style="margin-top:14px;color:#9aa0a6;">此帳戶尚未綁定 Agent TT，請改用上方 demo 帳戶或先註冊。</div>
       <button class="gauth-btn" onclick="closeGoogleAuth()">返回登入頁</button>
     </div>`;
 }
