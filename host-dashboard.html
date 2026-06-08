@@ -973,8 +973,8 @@
         </div>`;
     }).join('');
 
-    const cannedHtml = CANNED_REPLIES.map(r =>
-      `<button class="canned-chip" onclick="sendCanned(${JSON.stringify(r.text)})">${escHtml(r.label)}</button>`
+    const cannedHtml = CANNED_REPLIES.map((r, i) =>
+      `<button class="canned-chip" onclick="sendCanned(${i})">${escHtml(r.label)}</button>`
     ).join('');
 
     // 只在內容真的改變時才整段重繪，避免輪詢打斷使用者輸入
@@ -1030,9 +1030,11 @@
     window.dispatchEvent(new Event('agenttt:unread-changed'));
   }
 
-  function sendCanned(text) {
+  function sendCanned(i) {
+    const r = CANNED_REPLIES[i];
+    if (!r) return;
     const input = document.getElementById('chat-input-field');
-    if (input) { input.value = text; input.focus(); }
+    if (input) { input.value = r.text; input.focus(); }
   }
 
   function onChatKey(e) {

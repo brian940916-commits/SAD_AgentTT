@@ -419,9 +419,9 @@ function setFilter(f) {
 function renderList() {
   const today = new Date().toISOString().slice(0, 10);
   let allTrips = getTripsByUser(currentUser.id);
-  // 結束日期已過且仍是規劃中 → 自動標記完成
+  // 結束日期已過且仍是規劃中 → 自動標記完成（使用者手動設定過狀態的則不覆蓋）
   allTrips.forEach(t => {
-    if (t.status === 'planning' && t.endDate < today) {
+    if (t.status === 'planning' && t.endDate < today && !t.statusManual) {
       t.status = 'completed';
       saveTrip(t);
     }
@@ -514,6 +514,11 @@ function tripCardHTML(trip) {
           <div class="dropdown-menu hidden" id="more-${trip.id}">
             <button class="dropdown-item" onclick="openEditModal('${trip.id}')">✏️ 編輯行程</button>
             <a href="trip-readonly.html?id=${trip.id}" class="dropdown-item" target="_blank">🔗 分享行程</a>
+            <div class="dropdown-divider"></div>
+            ${trip.status === 'planning' ? `
+            <button class="dropdown-item" onclick="setTripStatus('${trip.id}','completed')">✅ 標記為已完成</button>
+            <button class="dropdown-item" onclick="setTripStatus('${trip.id}','cancelled')">🚫 標記為已取消</button>` : `
+            <button class="dropdown-item" onclick="setTripStatus('${trip.id}','planning')">↩️ 復原為規劃中</button>`}
             <div class="dropdown-divider"></div>
             <button class="dropdown-item danger" onclick="openDeleteModal('${trip.id}','${escAttr(trip.name)}')">🗑 刪除行程</button>
           </div>
@@ -734,6 +739,18 @@ function saveEditTrip() {
   saveTrip(trip);
   closeEditModal();
   showToast('行程已更新', 'success');
+  renderList();
+}
+
+function setTripStatus(tripId, status) {
+  const trip = getTripById(tripId);
+  if (!trip) return;
+  trip.status = status;
+  trip.statusManual = true;   // 標記為手動設定，避免被日期自動規則覆蓋
+  saveTrip(trip);
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+  const label = { planning: '已復原為規劃中', completed: '已標記為完成', cancelled: '已標記為取消' }[status] || '狀態已更新';
+  showToast(label, 'success');
   renderList();
 }
 

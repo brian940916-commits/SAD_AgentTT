@@ -269,6 +269,7 @@ function renderTickets() {
 }
 
 function ticketCardHTML(t) {
+  const user = getCurrentUser();   // 卡片內查連結行程需要，避免 ReferenceError 中斷整段渲染
   const isRefunded = t.status === 'refunded';
   const isUsed     = t.status === 'used';
   const isSplit    = t.status === 'split';

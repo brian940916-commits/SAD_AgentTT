@@ -419,10 +419,19 @@
 
     el.innerHTML = pending.map(p => {
       const th = thumb(p.id);
+      const photos = Array.isArray(p.photos) ? p.photos : [];
+      const coverHtml = photos.length
+        ? `<div class="card-thumb" style="padding:0;overflow:hidden;"><img src="${photos[0]}" alt="${escHtml(p.name)}" style="width:100%;height:100%;object-fit:cover;border-radius:var(--radius-md);"></div>`
+        : `<div class="card-thumb" style="background:${th.bg};">${th.emoji}</div>`;
+      const stripHtml = photos.length
+        ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${
+            photos.map((src, i) => `<img src="${src}" alt="房源照片 ${i+1}" title="點擊看大圖" onclick="window.open('${src}','_blank')" style="width:64px;height:54px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--color-border-light);">`).join('')
+          }</div>`
+        : `<div style="font-size:12px;color:var(--color-text-light);margin-top:8px;">⚠️ 房東未上傳照片</div>`;
       return `
         <div class="admin-card">
           <div class="card-row">
-            <div class="card-thumb" style="background:${th.bg};">${th.emoji}</div>
+            ${coverHtml}
             <div class="card-body">
               <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:4px;">
                 <div class="card-title">${escHtml(p.name)}</div>
@@ -433,6 +442,7 @@
                 平日 NT$ ${(p.priceWeekday||0).toLocaleString()}・假日 NT$ ${(p.priceWeekend||0).toLocaleString()}<br>
                 ${p.description ? escHtml(p.description.slice(0, 60)) + '…' : ''}
               </div>
+              ${stripHtml}
               <div class="card-actions">
                 <button class="btn btn-outline btn-sm" onclick="openPropDetail('${escHtml(p.id)}')">🔍 查看詳情</button>
                 <button class="btn btn-primary btn-sm" onclick="approveProp('${escHtml(p.id)}')">✅ 審核通過</button>
@@ -722,8 +732,8 @@
         </div>`;
     }).join('');
 
-    const quickHtml = QUICK_REPLIES.map(r =>
-      `<button class="quick-chip" onclick="sendCsReply(${JSON.stringify(r.text)})">${escHtml(r.label)}</button>`
+    const quickHtml = QUICK_REPLIES.map((r, i) =>
+      `<button class="quick-chip" onclick="sendCsReply(${i})">${escHtml(r.label)}</button>`
     ).join('');
 
     el.innerHTML = `
@@ -751,9 +761,11 @@
     }, 50);
   }
 
-  function sendCsReply(text) {
+  function sendCsReply(i) {
+    const r = QUICK_REPLIES[i];
+    if (!r) return;
     const inp = document.getElementById('cs-input-field');
-    if (inp) { inp.value = text; inp.focus(); }
+    if (inp) { inp.value = r.text; inp.focus(); }
   }
   function sendCsMsg() {
     const inp = document.getElementById('cs-input-field');
