@@ -458,6 +458,52 @@ function sendMessage(bookingId, senderRole, text) {
   return msg;
 }
 
+/* 取得或建立「訂房前詢問」對話（尚無 booking，以 propertyId+guestId 為合成鍵，
+   沿用既有以 bookingId 為鍵的訊息函式，讓房東訊息中心也能看到並回覆） */
+function getOrCreateInquiryConversation(property, guest) {
+  if (!property || !guest) return null;
+  const key   = 'inq_' + property.id + '_' + guest.id;
+  const convs = getConversations();
+  const existing = convs.find(c => c.bookingId === key);
+  if (existing) return existing;
+  const conv = {
+    id:            'conv_' + key,
+    bookingId:     key,
+    type:          'inquiry',
+    propertyId:    property.id,
+    propertyName:  property.name,
+    hostId:        property.hostId || null,
+    guestId:       guest.id,
+    guestName:     guest.name || '旅客',
+    messages:      [],
+    lastMessageAt: nowISO(),
+    createdAt:     nowISO(),
+  };
+  convs.push(conv);
+  setData(KEYS.MESSAGES, convs);
+  return conv;
+}
+
+/* 由系統代房東送出的自動回覆（senderRole=host、auto 標記；房東於訊息中心可見） */
+function pushAutoReply(conversationKey, text) {
+  const convs = getConversations();
+  const idx = convs.findIndex(c => c.bookingId === conversationKey);
+  if (idx < 0) return null;
+  const msg = {
+    id:        generateId(),
+    senderId:  convs[idx].hostId || '',
+    senderRole:'host',
+    auto:      true,
+    text,
+    createdAt: nowISO(),
+    readBy:    convs[idx].hostId ? [convs[idx].hostId] : [],
+  };
+  convs[idx].messages.push(msg);
+  convs[idx].lastMessageAt = msg.createdAt;
+  setData(KEYS.MESSAGES, convs);
+  return msg;
+}
+
 function markConversationRead(bookingId, userId) {
   const convs = getConversations();
   const idx = convs.findIndex(c => c.bookingId === bookingId);

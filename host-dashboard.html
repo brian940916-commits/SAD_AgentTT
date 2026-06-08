@@ -923,7 +923,7 @@
             <div class="conv-name">${escHtml(c.guestName)}</div>
             ${unread > 0 ? `<span style="background:#C4514A;color:#fff;font-size:10px;font-weight:700;border-radius:8px;padding:1px 6px;min-width:18px;text-align:center;">${unread > 9 ? '9+' : unread}</span>` : ''}
           </div>
-          <div class="conv-prop">📍 ${escHtml(c.propertyName)}</div>
+          <div class="conv-prop">📍 ${escHtml(c.propertyName)}${c.type === 'inquiry' ? ' <span style="font-size:10px;background:#FFF8E6;color:#7A5A1A;border-radius:8px;padding:0 6px;">訂房前詢問</span>' : ''}</div>
           <div class="conv-last">${preview}</div>
         </div>`;
     }).join('');
@@ -966,10 +966,11 @@
     // 用 senderRole 對比角色（host-dashboard 必為 host 視角）
     const msgsHtml = conv.messages.map(m => {
       const isMine = m.senderRole === 'host';
+      const autoTag = m.auto ? `<div style="font-size:10px;color:var(--color-text-light);text-align:right;margin-top:2px;">🤖 系統自動回覆</div>` : '';
       return `
         <div class="chat-msg ${isMine ? 'mine' : ''}">
           <div class="chat-avatar">${isMine ? escHtml(hostInitial) : escHtml(guestInitial)}</div>
-          <div class="chat-bubble">${escHtml(m.text)}</div>
+          <div><div class="chat-bubble">${escHtml(m.text)}</div>${autoTag}</div>
         </div>`;
     }).join('');
 

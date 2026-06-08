@@ -430,7 +430,8 @@
   const propId  = params.get('id');
   let   propData = null;
   let   chatOpen = false;
-  let   chatMsgs = [];  // { sender:'host'|'me', text, time }
+  let   inquiryConv = null;   // 與房東的「訂房前詢問」對話（真實訊息系統）
+  let   chatPollTimer = null;
 
   /* ── 初始化 ── */
   function init() {
@@ -776,33 +777,55 @@
   };
 
   function initChat() {
-    // 預設兩則：說明 + 歡迎
-    chatMsgs = [
-      { sender:'host', text:'💡 此為房源預諮詢（AI 模擬）。完成訂房後，可在「我的訂單」中與房東進行正式對話。', time: nowISO() },
-      { sender:'host', text:`您好！歡迎詢問「${propData.name}」，請問有什麼需要協助的嗎？😊`, time: nowISO() }
-    ];
+    // 建立／取得與房東的「訂房前詢問」對話（真實訊息系統，房東訊息中心可見）
+    inquiryConv = getOrCreateInquiryConversation(propData, currentUser);
+    // 首次進入時，由系統代房東送出歡迎訊息（房東也看得到此自動回覆）
+    if (inquiryConv && inquiryConv.messages.length === 0) {
+      pushAutoReply(inquiryConv.bookingId, `您好！歡迎詢問「${propData.name}」，有任何問題都可以問我，或點選下方常見問題 😊`);
+    }
     renderChatMessages();
-    // 顯示未讀提示
-    document.getElementById('chat-unread').style.display = 'flex';
+    updateChatUnread();
+  }
+
+  function refreshConv() { inquiryConv = getConversationByBookingId(inquiryConv?.bookingId); }
+
+  function updateChatUnread() {
+    refreshConv();
+    const badge = document.getElementById('chat-unread');
+    const unread = inquiryConv
+      ? inquiryConv.messages.filter(m => m.senderRole === 'host' && !(m.readBy || []).includes(currentUser.id)).length
+      : 0;
+    if (unread > 0 && !chatOpen) { badge.textContent = unread > 9 ? '9+' : unread; badge.style.display = 'flex'; }
+    else badge.style.display = 'none';
   }
 
   function toggleChat() {
     chatOpen = !chatOpen;
     document.getElementById('chat-window').classList.toggle('open', chatOpen);
     if (chatOpen) {
+      if (inquiryConv) markConversationRead(inquiryConv.bookingId, currentUser.id);
       document.getElementById('chat-unread').style.display = 'none';
-      scrollChatBottom();
+      renderChatMessages();
       document.getElementById('chat-input').focus();
+      // 輪詢房東於訊息中心的回覆
+      if (chatPollTimer) clearInterval(chatPollTimer);
+      chatPollTimer = setInterval(() => {
+        renderChatMessages();
+        if (inquiryConv) markConversationRead(inquiryConv.bookingId, currentUser.id);
+      }, 2000);
+    } else if (chatPollTimer) {
+      clearInterval(chatPollTimer); chatPollTimer = null;
     }
   }
   function openChat()  { if (!chatOpen) toggleChat(); }
   function closeChat() { if (chatOpen)  toggleChat(); }
 
   function renderChatMessages() {
-    const user = currentUser || { name: '我' };
-    document.getElementById('chat-messages').innerHTML = chatMsgs.map(m => {
-      const isMine = m.sender === 'me';
-      const initial = isMine ? (user.name || '我').slice(0,1) : '🏠';
+    refreshConv();
+    const msgs = inquiryConv ? inquiryConv.messages : [];
+    document.getElementById('chat-messages').innerHTML = msgs.map(m => {
+      const isMine  = m.senderRole === 'guest';
+      const initial = isMine ? (currentUser.name || '我').slice(0,1) : '🏠';
       return `
         <div class="chat-msg ${isMine ? 'mine' : ''}">
           <div class="chat-msg-avatar">${initial}</div>
@@ -817,30 +840,29 @@
     setTimeout(() => { box.scrollTop = box.scrollHeight; }, 50);
   }
 
+  /* 顧客送出訊息 → 寫入對話，並由系統代房東自動回覆 */
+  function pushGuestMsg(text) {
+    if (!inquiryConv) return;
+    sendMessage(inquiryConv.bookingId, 'guest', text);
+    renderChatMessages();
+    setTimeout(() => {
+      const reply = CANNED_ANSWERS[text] || '感謝您的詢問，房東會盡快回覆您！如急需協助可於完成訂房後於「我的訂單」聯繫。';
+      pushAutoReply(inquiryConv.bookingId, reply);
+      renderChatMessages();
+    }, 700);
+  }
+
   function sendMsg() {
     const input = document.getElementById('chat-input');
     const text  = input.value.trim();
     if (!text) return;
     input.value = '';
-    chatMsgs.push({ sender:'me', text, time: nowISO() });
-    renderChatMessages();
-    // 自動回覆（延遲 1s）
-    setTimeout(() => {
-      chatMsgs.push({ sender:'host', text:'感謝您的訊息！我們會盡快回覆您，通常在 30 分鐘內。如有急事請來電 📞', time: nowISO() });
-      renderChatMessages();
-    }, 1000);
+    pushGuestMsg(text);
   }
 
   function sendCanned(text) {
-    chatMsgs.push({ sender:'me', text, time: nowISO() });
-    renderChatMessages();
-    if (!chatOpen) { document.getElementById('chat-window').classList.add('open'); chatOpen = true; }
-    document.getElementById('chat-unread').style.display = 'none';
-    setTimeout(() => {
-      const reply = CANNED_ANSWERS[text] || '感謝您的詢問，我們稍後回覆您！';
-      chatMsgs.push({ sender:'host', text: reply, time: nowISO() });
-      renderChatMessages();
-    }, 800);
+    if (!chatOpen) toggleChat();
+    pushGuestMsg(text);
   }
 
   function onChatKey(e) {
