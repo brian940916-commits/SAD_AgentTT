@@ -93,7 +93,7 @@
     .review-text   { font-size: 13px; color: var(--color-text-sub); line-height: 1.7; }
 
     /* ── 客服管理 ── */
-    .cs-layout { display: grid; grid-template-columns: 240px 1fr; background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); overflow: hidden; height: 580px; }
+    .cs-layout { display: grid; grid-template-columns: 240px 1fr; grid-template-rows: 1fr; background: #fff; border-radius: var(--radius-lg); border: 1px solid var(--color-border-light); overflow: hidden; height: 580px; }
     .case-list  { border-right: 1px solid var(--color-border-light); overflow-y: auto; display: flex; flex-direction: column; }
     .case-filter { padding: 8px; border-bottom: 1px solid var(--color-border-light); display: flex; gap: 4px; flex-wrap: wrap; }
     .case-ftab { padding: 4px 8px; border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; border: 1px solid var(--color-border); background: #fff; font-family: var(--font-main); color: var(--color-text-sub); }
@@ -108,11 +108,11 @@
     .case-status.active  { color: var(--color-primary); }
     .case-status.closed  { color: var(--color-text-light); }
 
-    .cs-main  { display: flex; flex-direction: column; }
+    .cs-main  { display: flex; flex-direction: column; min-height: 0; }
     .cs-head  { padding: 12px var(--space-md); background: var(--color-secondary); border-bottom: 1px solid var(--color-border-light); }
     .cs-head-title { font-size: 14px; font-weight: 700; color: var(--color-text-main); }
     .cs-head-meta  { font-size: 12px; color: var(--color-text-sub); margin-top: 2px; }
-    .cs-msgs  { flex: 1; overflow-y: auto; padding: var(--space-md); }
+    .cs-msgs  { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-md); }
     .cs-msg   { display: flex; gap: 8px; margin-bottom: var(--space-sm); }
     .cs-msg.admin { flex-direction: row-reverse; }
     .cs-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }

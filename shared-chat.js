@@ -72,7 +72,7 @@
         font-size: 22px; cursor: pointer; padding: 0 4px;
       }
       .att-chat-body {
-        flex: 1; overflow-y: auto; padding: 16px;
+        flex: 1; min-height: 0; overflow-y: auto; padding: 16px;
         background: #FAF6EC; display: flex; flex-direction: column; gap: 10px;
       }
       .att-chat-empty {
