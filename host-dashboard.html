@@ -465,6 +465,7 @@
   let activeConvIdx = 0;
   let convData      = [];
   let editingPropId = '';
+  let currentPhotos = [];   // 編輯中房源的照片（base64 縮圖），最多 5 張
 
   /* ════════════════════════════════
      初始化
@@ -572,6 +573,8 @@
       document.querySelectorAll('.fac-grid input[type=checkbox]').forEach(cb => {
         cb.checked = (p.facilities || []).includes(cb.value);
       });
+      currentPhotos = Array.isArray(p.photos) ? p.photos.slice() : [];
+      renderPhotoPreview();
     } else {
       editingPropId = '';
       document.getElementById('add-panel-title').textContent = '🏠 新增房源';
@@ -584,7 +587,8 @@
       document.getElementById('p-guests').value   = 2;
       document.getElementById('p-rooms').value    = 1;
       document.querySelectorAll('.fac-grid input[type=checkbox]').forEach(cb => cb.checked = false);
-      document.getElementById('prop-photo-prev').innerHTML = '';
+      currentPhotos = [];
+      renderPhotoPreview();
     }
     panel.classList.add('open');
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -620,6 +624,7 @@
       priceWeekend: Number(document.getElementById('p-price-we').value) || 0,
       priceHoliday: Number(document.getElementById('p-price-h').value) || 0,
       facilities,
+      photos:       currentPhotos.slice(),
       status:       'pending',
       rejectReason: '',
       rating:       existProp?.rating || 0,
@@ -627,7 +632,15 @@
       createdAt:    existProp?.createdAt || nowISO(),
     };
 
-    saveProperty(prop);
+    // 先試算容量：照片可能撐爆 localStorage，失敗就提示而非靜默失敗
+    const all = getProperties();
+    const idx = all.findIndex(p => p.id === prop.id);
+    if (idx >= 0) all[idx] = prop; else all.push(prop);
+    if (!trySetData(KEYS.PROPERTIES, all)) {
+      errEl.textContent = '照片容量過大，瀏覽器儲存空間不足。請減少照片數量或刪除部分後再試。';
+      errEl.style.display = 'block';
+      return;
+    }
     hostProps = getProperties().filter(p => p.hostId === currentUser.id);
     document.getElementById('add-prop-panel').classList.remove('open');
     renderPropList();
@@ -647,9 +660,12 @@
       const isRejected  = p.status === 'offline' && !!p.rejectReason;
       const statusMap   = { pending:'badge-pending', online:'badge-online', offline:'badge-offline' };
       const statusLbl   = { pending:'待審核', online:'上線中', offline: isRejected ? '審核退件' : '已下架' };
+      const cover = (p.photos && p.photos.length)
+        ? `<div class="prop-host-thumb" style="padding:0;overflow:hidden;"><img src="${p.photos[0]}" alt="${escHtml(p.name)}" style="width:100%;height:100%;object-fit:cover;border-radius:var(--radius-md);"></div>`
+        : `<div class="prop-host-thumb" style="background:${th.bg};">${th.emoji}</div>`;
       return `
         <div class="prop-host-card">
-          <div class="prop-host-thumb" style="background:${th.bg};">${th.emoji}</div>
+          ${cover}
           <div class="prop-host-body">
             <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:4px;">
               <div class="prop-host-name">${escHtml(p.name)}</div>
@@ -684,19 +700,28 @@
     showToast('⚠️ 請修改後點擊「送出審核」，管理員審核通過後才會上線');
   }
 
-  function previewPropPhotos(input) {
+  async function previewPropPhotos(input) {
+    const room = 5 - currentPhotos.length;
+    if (room <= 0) { showToast('最多只能上傳 5 張照片'); input.value = ''; return; }
+    const added = await downscaleImageFiles(input.files, room, 1000, 0.8);
+    currentPhotos = currentPhotos.concat(added).slice(0, 5);
+    input.value = '';   // 允許重新選同一檔
+    renderPhotoPreview();
+  }
+
+  function renderPhotoPreview() {
     const row = document.getElementById('prop-photo-prev');
-    row.innerHTML = '';
-    Array.from(input.files).slice(0, 5).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.className = 'photo-prev-img';
-        row.appendChild(img);
-      };
-      reader.readAsDataURL(file);
-    });
+    row.innerHTML = currentPhotos.map((src, i) => `
+      <div style="position:relative;display:inline-block;">
+        <img src="${src}" class="photo-prev-img" alt="房源照片 ${i+1}">
+        <button type="button" onclick="removePropPhoto(${i})" title="移除"
+          style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:1;cursor:pointer;">×</button>
+      </div>`).join('');
+  }
+
+  function removePropPhoto(i) {
+    currentPhotos.splice(i, 1);
+    renderPhotoPreview();
   }
 
   /* ════════════════════════════════

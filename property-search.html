@@ -506,10 +506,14 @@
       const isFav  = faves.includes(p.id);
       const stars  = '★'.repeat(Math.round(p.rating || 0)) + '☆'.repeat(5 - Math.round(p.rating || 0));
       const hasDiscount = nights >= 2;
+      const hasPhoto = p.photos && p.photos.length;
+      const thumbStyle = hasPhoto
+        ? `background-image:url('${p.photos[0]}');background-size:cover;background-position:center;`
+        : `background:${d.bg};`;
       return `
         <div class="prop-card" id="card-${escHtml(p.id)}">
-          <div class="prop-thumb" style="background:${d.bg};">
-            <span>${d.emoji}</span>
+          <div class="prop-thumb" style="${thumbStyle}">
+            ${hasPhoto ? '' : `<span>${d.emoji}</span>`}
             ${hasDiscount ? `<span class="discount-tag">訂2晚8折</span>` : ''}
             <button class="fav-btn" onclick="toggleFav(event,'${escHtml(p.id)}')" title="${isFav ? '取消收藏' : '加入收藏'}" aria-label="${isFav ? '取消收藏' : '加入收藏'}">
               ${isFav ? '❤️' : '🤍'}

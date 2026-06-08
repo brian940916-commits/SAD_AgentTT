@@ -159,6 +159,48 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+/* ── 圖片處理 ─────────────────────────────────────────────── */
+/* 把上傳的 File 用 canvas 縮圖並轉成 JPEG base64，避免原圖塞爆 localStorage。
+   依 EXIF 不處理（canvas 會吃瀏覽器自動方向校正），預設最寬 1000px、品質 0.8。
+   回傳 Promise<string|null>（非圖片或失敗回 null）。 */
+function downscaleImageFile(file, maxW, quality) {
+  maxW = maxW || 1000;
+  quality = quality || 0.8;
+  return new Promise(resolve => {
+    if (!file || !file.type || !file.type.startsWith('image/')) { resolve(null); return; }
+    const reader = new FileReader();
+    reader.onerror = () => resolve(null);
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = () => resolve(null);
+      img.onload = () => {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        try { resolve(canvas.toDataURL('image/jpeg', quality)); }
+        catch (err) { resolve(null); }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* 批次縮圖：FileList/Array<File> → Promise<Array<string>>，可限制最多幾張 */
+function downscaleImageFiles(files, max, maxW, quality) {
+  const arr = Array.from(files || []).slice(0, max || 5);
+  return Promise.all(arr.map(f => downscaleImageFile(f, maxW, quality)))
+    .then(list => list.filter(Boolean));
+}
+
+/* 安全寫入 localStorage：容量不足時回傳 false（讓呼叫端提示使用者），不丟例外 */
+function trySetData(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch (e) { return false; }
+}
+
 /* ── 使用者 ──────────────────────────────────────────────── */
 
 function getCurrentUser() {

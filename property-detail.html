@@ -470,8 +470,27 @@
 
   /* ── 照片格 ── */
   function renderPhotos() {
+    const grid = document.getElementById('photo-grid');
+    const real = Array.isArray(propData.photos) ? propData.photos : [];
+
+    if (real.length) {
+      // 房東實際上傳的照片：補滿 5 格（不足的格子用第一張填，維持版面）
+      const cells = [];
+      for (let i = 0; i < 5; i++) {
+        const src = real[i] || real[0];
+        cells.push(
+          `<div class="photo-cell" style="padding:0;overflow:hidden;background:#f0ede5;">
+             <img src="${src}" alt="房源照片 ${i+1}" style="width:100%;height:100%;object-fit:cover;">
+             ${i === 4 ? `<div class="photo-more">📷 共 ${real.length} 張照片</div>` : ''}
+           </div>`);
+      }
+      grid.innerHTML = cells.join('');
+      return;
+    }
+
+    // 無上傳照片：沿用 emoji 佔位
     const photos = pdisplay(propId).photos;
-    document.getElementById('photo-grid').innerHTML = photos.map((p, i) =>
+    grid.innerHTML = photos.map((p, i) =>
       `<div class="photo-cell" style="background:${p.bg};">
          ${p.emoji}
          ${i === 4 ? `<div class="photo-more">📷 查看全部照片</div>` : ''}
@@ -601,6 +620,12 @@
         const initial = name.slice(0, 1);
         const date    = r.createdAt ? r.createdAt.slice(0, 10) : (r.date || '');
         const stars   = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+        const photos  = Array.isArray(r.photos) ? r.photos : [];
+        const photoHtml = photos.length
+          ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">${
+              photos.map((src, i) => `<img src="${src}" alt="評價照片 ${i+1}" style="width:84px;height:84px;object-fit:cover;border-radius:8px;cursor:pointer;" onclick="window.open('${src}','_blank')">`).join('')
+            }</div>`
+          : '';
         return `
           <div class="review-card">
             <div class="review-header">
@@ -612,6 +637,7 @@
               <div class="review-stars" style="margin-left:auto;">${stars}</div>
             </div>
             <div class="review-text">${escHtml(r.text)}</div>
+            ${photoHtml}
           </div>`;
       }).join('');
   }

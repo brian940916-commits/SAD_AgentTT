@@ -340,6 +340,7 @@
   let cancelBooking = null;   // 正在取消的訂單
   let reviewBooking = null;   // 正在評價的訂單
   let reviewRating  = 0;
+  let reviewPhotos  = [];     // 評價照片（base64 縮圖），最多 4 張
 
   /* ── 初始化 ── */
   function init() {
@@ -557,6 +558,7 @@
 
     /* 重置評分 */
     setRating(0);
+    reviewPhotos = [];
     document.getElementById('review-text').value = '';
     document.getElementById('photo-preview-row').innerHTML = '';
     document.getElementById('err-rating').style.display = 'none';
@@ -594,20 +596,28 @@
   });
 
   /* ── 照片預覽 ── */
-  function previewPhotos(input) {
+  async function previewPhotos(input) {
+    const room = 4 - reviewPhotos.length;
+    if (room <= 0) { showToast('最多只能上傳 4 張照片'); input.value = ''; return; }
+    const added = await downscaleImageFiles(input.files, room, 1000, 0.8);
+    reviewPhotos = reviewPhotos.concat(added).slice(0, 4);
+    input.value = '';
+    renderReviewPhotoPreview();
+  }
+
+  function renderReviewPhotoPreview() {
     const row = document.getElementById('photo-preview-row');
-    row.innerHTML = '';
-    Array.from(input.files).slice(0, 4).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.className = 'photo-preview-thumb';
-        img.alt = file.name;
-        row.appendChild(img);
-      };
-      reader.readAsDataURL(file);
-    });
+    row.innerHTML = reviewPhotos.map((src, i) => `
+      <div style="position:relative;display:inline-block;">
+        <img src="${src}" class="photo-preview-thumb" alt="評價照片 ${i+1}">
+        <button type="button" onclick="removeReviewPhoto(${i})" title="移除"
+          style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:1;cursor:pointer;">×</button>
+      </div>`).join('');
+  }
+
+  function removeReviewPhoto(i) {
+    reviewPhotos.splice(i, 1);
+    renderReviewPhotoPreview();
   }
 
   /* ── 送出評價 ── */
@@ -629,7 +639,7 @@
     }
     if (!ok) return;
 
-    saveReview({
+    const newReview = {
       id:          generateId(),
       bookingId:   reviewBooking.id,
       propertyId:  reviewBooking.propertyId,
@@ -637,8 +647,17 @@
       userName:    currentUser.name,
       rating:      reviewRating,
       text,
+      photos:      reviewPhotos.slice(),
       createdAt:   nowISO(),
-    });
+    };
+    const allReviews = getReviews();
+    allReviews.push(newReview);
+    if (!trySetData(REVIEWS_KEY, allReviews)) {
+      const er = document.getElementById('err-review');
+      er.textContent = '照片容量過大，瀏覽器儲存空間不足，請減少照片後再送出';
+      er.style.display = 'block';
+      return;
+    }
 
     // 同步更新房源的平均評分與評價數
     const prop = getPropertyById(reviewBooking.propertyId);
